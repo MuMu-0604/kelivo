@@ -1,4 +1,4 @@
-# Kelivo Plus 1.1.17+4069 Release Notes
+# Kelivo Plus 1.1.17+4070 Release Notes
 
 发布日期：2026-07-26
 
@@ -9,13 +9,13 @@
 Release 资产包含最新版 Android arm64 APK：
 
 ```text
-Kelivo_android_1.1.17+4069_github-tools-parameter-hardening_fixedsign_arm64-v8a.apk
+Kelivo_android_1.1.17+4070_github-pr-review-comment-fix_fixedsign_arm64-v8a.apk
 ```
 
 SHA256：
 
 ```text
-091DD976A05AB950BF8B64391FC592EF289356A3797DB1A88574AB8B4118C0AD
+8A5004305CD6DB2B463EEEFB50EA25A894F121DB0F5C1C4CCE5842A6921ECD05
 ```
 
 ## 重要变更
@@ -28,6 +28,8 @@ SHA256：
 - 优化 GitHub 工具封装：按业务分组，中文工具说明，参数按 GitHub API 规则收敛。
 - 新增 Local Hybrid Search：无需 API Key，聚合多个本地搜索源并进行过滤、去重、排序。
 - 增强 Android 分享导入：支持文本和多类型文件进入对话，再由助手导入到目标配置。
+- 修复 GitHub PR review inline comment：新建 inline comment 不再要求或发送 `in_reply_to`；只有回复已有 review comment 时才发送 `body` 和 `in_reply_to`。
+- 明确写入验证策略：新建/更新文件后不使用 GitHub code search 做强一致验证，应使用 `get_file`、`list_directory`、`get_commit` 或 `compare_refs`。
 
 ## GitHub 工具修复
 
@@ -46,7 +48,7 @@ SHA256：
 - 推荐先备份/导出原版数据，卸载原版，再安装 Kelivo Plus。
 - 如需共存，请自行构建独立包名版本，例如把 Android `applicationId` 改为 `com.psyche.kelivo.plus`，并用自己的签名打包；共存版拥有独立应用数据，需要通过备份/导入迁移。
 - 覆盖安装旧 Kelivo Plus 二改版要求 APK 签名与已安装版本一致。
-- 如果 Android 提示“无法降级”，请确认当前已安装版本号是否高于 `1.1.17+4069`。
+- 如果 Android 提示“无法降级”，请确认当前已安装版本号是否高于 `1.1.17+4070`。
 - GitHub Token 不会随应用内置，需要在 MCP 编辑页自行配置。
 - App Control Agent 是高权限能力，仅建议对可信助手开启。
 

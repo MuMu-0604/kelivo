@@ -78,8 +78,8 @@ The wrapper layer also follows GitHub API constraints more strictly: empty repos
 
 Download links:
 
-- Latest Release page: [Kelivo Plus 1.1.17+4069](https://github.com/MuMu-0604/kelivo/releases/tag/v1.1.17-plus.4069)
-- Direct Android arm64 APK: [Kelivo_android_1.1.17+4069_github-tools-parameter-hardening_fixedsign_arm64-v8a.apk](https://github.com/MuMu-0604/kelivo/releases/download/v1.1.17-plus.4069/Kelivo_android_1.1.17%2B4069_github-tools-parameter-hardening_fixedsign_arm64-v8a.apk)
+- Latest Release page: [Kelivo Plus 1.1.17+4070](https://github.com/MuMu-0604/kelivo/releases/tag/v1.1.17-plus.4070)
+- Direct Android arm64 APK: [Kelivo_android_1.1.17+4070_github-pr-review-comment-fix_fixedsign_arm64-v8a.apk](https://github.com/MuMu-0604/kelivo/releases/download/v1.1.17-plus.4070/Kelivo_android_1.1.17%2B4070_github-pr-review-comment-fix_fixedsign_arm64-v8a.apk)
 
 The public APK keeps the Android package name `com.psyche.kelivo`, the same as upstream Kelivo, so Android treats it as the same app:
 
