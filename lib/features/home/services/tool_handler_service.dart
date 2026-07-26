@@ -189,7 +189,7 @@ class ToolHandlerService {
       toolDefs.addAll(_buildMemoryToolDefinitions());
     }
 
-    // App Control tools
+    // 神经权能网关 tools
     if (assistant?.appControlEnabled == true && supportsTools) {
       toolDefs.add(AppControlService.getToolDefinition());
     }
@@ -373,13 +373,13 @@ class ToolHandlerService {
           return memoryResult;
         }
 
-        // App Control tool
+        // 神经权能网关 tool
         if (name == AppControlToolNames.appControl) {
           if (assistant?.appControlEnabled != true) {
             return _toolError(
               error: 'permission_required',
               message:
-                  'Current assistant has not been granted App Control permission.',
+                  'Current assistant has not been granted 神经权能网关 permission.',
               tool: name,
             );
           }

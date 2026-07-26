@@ -275,7 +275,7 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
               _iosSwitchRow(
                 context,
                 icon: Lucide.Shield,
-                label: 'App Control Agent',
+                label: '神经权能网关',
                 value: a.appControlEnabled,
                 onChanged: (v) => context
                     .read<AssistantProvider>()

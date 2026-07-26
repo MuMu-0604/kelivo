@@ -9,6 +9,7 @@ import 'package:Kelivo/core/models/assistant.dart';
 import 'package:Kelivo/core/providers/assistant_provider.dart';
 import 'package:Kelivo/core/providers/instruction_injection_provider.dart';
 import 'package:Kelivo/core/providers/memory_provider.dart';
+import 'package:Kelivo/core/providers/mcp_provider.dart';
 import 'package:Kelivo/core/providers/quick_phrase_provider.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/providers/skill_provider.dart';
@@ -24,9 +25,7 @@ void main() {
     SharedPreferences.setMockInitialValues({});
   });
 
-  testWidgets('app control appends and undoes assistant prompt', (
-    tester,
-  ) async {
+  testWidgets('神经权能网关 appends and undoes assistant prompt', (tester) async {
     const assistant = Assistant(
       id: 'assistant-a',
       name: 'Assistant',
@@ -68,9 +67,7 @@ void main() {
     expect(ap.getById(assistant.id)!.systemPrompt, 'Base prompt');
   });
 
-  testWidgets('app control creates active instruction injection', (
-    tester,
-  ) async {
+  testWidgets('神经权能网关 creates active instruction injection', (tester) async {
     const assistant = Assistant(
       id: 'assistant-a',
       name: 'Assistant',
@@ -103,9 +100,7 @@ void main() {
     expect(provider.activeIdsFor(assistant.id), contains(created.id));
   });
 
-  testWidgets('app control refuses execution without permission', (
-    tester,
-  ) async {
+  testWidgets('神经权能网关 refuses execution without permission', (tester) async {
     const assistant = Assistant(id: 'assistant-a', name: 'Assistant');
 
     await _pumpScope(tester, assistant);
@@ -127,7 +122,7 @@ void main() {
     expect(result['error'], 'permission_required');
   });
 
-  testWidgets('app control updates assistant settings from JSON and undoes', (
+  testWidgets('神经权能网关 updates assistant settings from JSON and undoes', (
     tester,
   ) async {
     const assistant = Assistant(
@@ -177,9 +172,7 @@ void main() {
     expect(restored.enableMemory, isFalse);
   });
 
-  testWidgets('app control creates active skill and can undo it', (
-    tester,
-  ) async {
+  testWidgets('神经权能网关 creates active skill and can undo it', (tester) async {
     const assistant = Assistant(
       id: 'assistant-a',
       name: 'Assistant',
@@ -221,7 +214,7 @@ void main() {
     expect(ap.getById(assistant.id)!.skillIds, isNot(contains(skillId)));
   });
 
-  testWidgets('app control binds local tools without content', (tester) async {
+  testWidgets('神经权能网关 binds local tools without content', (tester) async {
     const assistant = Assistant(
       id: 'assistant-a',
       name: 'Assistant',
@@ -255,7 +248,7 @@ void main() {
     );
   });
 
-  testWidgets('app control creates assistant quick phrase', (tester) async {
+  testWidgets('神经权能网关 creates assistant quick phrase', (tester) async {
     const assistant = Assistant(
       id: 'assistant-a',
       name: 'Assistant',
@@ -285,7 +278,7 @@ void main() {
     expect(phrase.assistantId, assistant.id);
   });
 
-  testWidgets('app control creates memory and can undo it', (tester) async {
+  testWidgets('神经权能网关 creates memory and can undo it', (tester) async {
     const assistant = Assistant(
       id: 'assistant-a',
       name: 'Assistant',
@@ -303,7 +296,7 @@ void main() {
                 'action': AppControlActionNames.executeAction,
                 'target': AppControlTargets.currentAssistantMemory,
                 'operation': AppControlOperations.create,
-                'content': 'Prefers compact app-control plans.',
+                'content': 'Prefers compact 神经权能网关 plans.',
               }, assistant),
             )
             as Map<String, dynamic>;
@@ -323,7 +316,213 @@ void main() {
     expect(mp.getForAssistant(assistant.id), isEmpty);
   });
 
-  testWidgets('app control updates search settings from JSON and undoes', (
+  testWidgets('神经权能网关 updates and deletes memory with undo', (tester) async {
+    const assistant = Assistant(
+      id: 'assistant-a',
+      name: 'Assistant',
+      appControlEnabled: true,
+    );
+
+    await _pumpScope(tester, assistant);
+    final context = tester.element(find.byType(SizedBox));
+    final service = AppControlService(contextProvider: context);
+    final mp = context.read<MemoryProvider>();
+    final memory = await mp.add(assistantId: assistant.id, content: 'Old');
+
+    final update =
+        jsonDecode(
+              await service.handleToolCall({
+                'action': AppControlActionNames.executeAction,
+                'target': AppControlTargets.currentAssistantMemory,
+                'operation': AppControlOperations.update,
+                'id': memory.id,
+                'content': 'New',
+              }, assistant),
+            )
+            as Map<String, dynamic>;
+
+    expect(update['success'], isTrue);
+    expect(mp.getForAssistant(assistant.id).single.content, 'New');
+
+    final delete =
+        jsonDecode(
+              await service.handleToolCall({
+                'action': AppControlActionNames.executeAction,
+                'target': AppControlTargets.currentAssistantMemory,
+                'operation': AppControlOperations.delete,
+                'id': memory.id,
+              }, assistant),
+            )
+            as Map<String, dynamic>;
+
+    expect(delete['success'], isTrue);
+    expect(mp.getForAssistant(assistant.id), isEmpty);
+
+    await service.handleToolCall({
+      'action': AppControlActionNames.undoLast,
+    }, assistant);
+
+    expect(mp.getForAssistant(assistant.id).single.content, 'New');
+  });
+
+  testWidgets('神经权能网关 updates skill and rolls back a version', (tester) async {
+    const assistant = Assistant(
+      id: 'assistant-a',
+      name: 'Assistant',
+      appControlEnabled: true,
+    );
+
+    await _pumpScope(tester, assistant);
+    final context = tester.element(find.byType(SizedBox));
+    final service = AppControlService(contextProvider: context);
+    final sp = context.read<SkillProvider>();
+    final skillId = await sp.addSkill(name: 'Skill', content: 'v1');
+
+    final version =
+        jsonDecode(
+              await service.handleToolCall({
+                'action': AppControlActionNames.executeAction,
+                'target': AppControlTargets.currentAssistantSkills,
+                'operation': AppControlOperations.createVersion,
+                'id': skillId,
+              }, assistant),
+            )
+            as Map<String, dynamic>;
+    final versionId = version['skill_id'] as String;
+
+    await service.handleToolCall({
+      'action': AppControlActionNames.executeAction,
+      'target': AppControlTargets.currentAssistantSkills,
+      'operation': AppControlOperations.update,
+      'id': skillId,
+      'content': jsonEncode({'content': 'v2', 'name': 'Skill v2'}),
+    }, assistant);
+
+    expect(sp.getById(skillId)!.content, 'v2');
+
+    final rollback =
+        jsonDecode(
+              await service.handleToolCall({
+                'action': AppControlActionNames.executeAction,
+                'target': AppControlTargets.currentAssistantSkills,
+                'operation': AppControlOperations.rollbackVersion,
+                'id': skillId,
+                'version_id': versionId,
+              }, assistant),
+            )
+            as Map<String, dynamic>;
+
+    expect(rollback['success'], isTrue);
+    expect(sp.getById(skillId)!.content, 'v1');
+  });
+
+  testWidgets('神经权能网关 edits world book entries and exports bundle', (
+    tester,
+  ) async {
+    const assistant = Assistant(
+      id: 'assistant-a',
+      name: 'Assistant',
+      appControlEnabled: true,
+    );
+
+    await _pumpScope(tester, assistant);
+    final context = tester.element(find.byType(SizedBox));
+    final service = AppControlService(contextProvider: context);
+    final wp = context.read<WorldBookProvider>();
+
+    final created =
+        jsonDecode(
+              await service.handleToolCall({
+                'action': AppControlActionNames.executeAction,
+                'target': AppControlTargets.worldBook,
+                'operation': AppControlOperations.create,
+                'title': 'Lore',
+                'content': 'Base entry',
+                'keywords': ['base'],
+                'activate': true,
+              }, assistant),
+            )
+            as Map<String, dynamic>;
+    final bookId = created['id'] as String;
+
+    final added =
+        jsonDecode(
+              await service.handleToolCall({
+                'action': AppControlActionNames.executeAction,
+                'target': AppControlTargets.worldBook,
+                'operation': AppControlOperations.addEntry,
+                'book_id': bookId,
+                'title': 'Second',
+                'content': jsonEncode({
+                  'content': 'Second entry',
+                  'keywords': ['second'],
+                }),
+              }, assistant),
+            )
+            as Map<String, dynamic>;
+    final entryId = added['entry_id'] as String;
+
+    await service.handleToolCall({
+      'action': AppControlActionNames.executeAction,
+      'target': AppControlTargets.worldBook,
+      'operation': AppControlOperations.updateEntry,
+      'book_id': bookId,
+      'entry_id': entryId,
+      'content': jsonEncode({'content': 'Updated entry'}),
+    }, assistant);
+
+    expect(wp.getById(bookId)!.entries, hasLength(2));
+    expect(
+      wp.getById(bookId)!.entries.firstWhere((e) => e.id == entryId).content,
+      'Updated entry',
+    );
+
+    final exported =
+        jsonDecode(
+              await service.handleToolCall({
+                'action': AppControlActionNames.executeAction,
+                'target': AppControlTargets.appBundle,
+                'operation': AppControlOperations.exportJson,
+              }, assistant),
+            )
+            as Map<String, dynamic>;
+
+    expect(exported['type'], 'app_control_export');
+    expect((exported['payload'] as Map)['world_books'], isA<Map>());
+  });
+
+  testWidgets('神经权能网关 records audit log', (tester) async {
+    const assistant = Assistant(
+      id: 'assistant-a',
+      name: 'Assistant',
+      appControlEnabled: true,
+    );
+
+    await _pumpScope(tester, assistant);
+    final context = tester.element(find.byType(SizedBox));
+    final service = AppControlService(contextProvider: context);
+
+    await service.handleToolCall({
+      'action': AppControlActionNames.executeAction,
+      'target': AppControlTargets.currentAssistantSystemPrompt,
+      'operation': AppControlOperations.append,
+      'content': 'Audit me',
+    }, assistant);
+
+    final audit =
+        jsonDecode(
+              await service.handleToolCall({
+                'action': AppControlActionNames.inspectTarget,
+                'target': AppControlTargets.auditLog,
+              }, assistant),
+            )
+            as Map<String, dynamic>;
+
+    expect(audit['type'], 'app_control_audit_log');
+    expect(audit['items'], isNotEmpty);
+  });
+
+  testWidgets('神经权能网关 updates search settings from JSON and undoes', (
     tester,
   ) async {
     const assistant = Assistant(
@@ -389,6 +588,7 @@ Future<void> _pumpScope(WidgetTester tester, Assistant assistant) async {
           create: (_) => WorldBookProvider(),
         ),
         ChangeNotifierProvider<MemoryProvider>(create: (_) => MemoryProvider()),
+        ChangeNotifierProvider<McpProvider>(create: (_) => McpProvider()),
         ChangeNotifierProvider<SkillProvider>(create: (_) => SkillProvider()),
         ChangeNotifierProvider<QuickPhraseProvider>(
           create: (_) => QuickPhraseProvider(),

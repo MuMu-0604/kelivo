@@ -1,26 +1,27 @@
-# Kelivo Plus 1.1.17+4070 Release Notes
+# Kelivo Plus 1.1.17+4071 Release Notes
 
 发布日期：2026-07-26
 
-本版本是基于 [Chevey339/kelivo](https://github.com/Chevey339/kelivo) 的二次开发公开版本，重点整合 App Control Agent、Skills、内置 MCP、GitHub 写入工具、本地混合搜索和 Android 移动端导入增强。
+本版本是基于 [Chevey339/kelivo](https://github.com/Chevey339/kelivo) 的二次开发公开版本，重点整合神经权能网关、Skills、内置 MCP、GitHub 写入工具、本地混合搜索和 Android 移动端导入增强。
 
 ## 下载
 
-Release 资产包含最新版 Android arm64 APK：
+Release 资产包含最新版 Android 通用 APK：
 
 ```text
-Kelivo_android_1.1.17+4070_github-pr-review-comment-fix_fixedsign_arm64-v8a.apk
+Kelivo_android_1.1.17+4071_neural-authority-gateway_fixedsign_universal.apk
 ```
 
 SHA256：
 
 ```text
-8A5004305CD6DB2B463EEEFB50EA25A894F121DB0F5C1C4CCE5842A6921ECD05
+8B26698F6D2EE5BB35AD9CC8813953700FD651F8F668A6E5A7DC2EDE95C7AB20
 ```
 
 ## 重要变更
 
-- 新增 App Control Agent：允许授权助手在对话中导入、编辑和撤销 App 配置。
+- 新增神经权能网关：允许授权助手在对话中导入、编辑和撤销 App 配置，并替代旧的 App Control Agent 可见命名。
+- 扩展神经权能网关：补齐删除、更新、列表/详情、世界书 entry 细粒度编辑、快捷短语排序、技能版本快照/回滚、批量 JSON 导入导出和操作审计。
 - 新增助手级高权限开关：默认关闭，用户可按助手授予配置控制能力。
 - 新增 Skills 系统：支持创建、导入、触发词匹配和助手绑定。
 - 新增内置 MCP 服务：Files、Images、GitHub，并保留 Fetch。
@@ -48,9 +49,9 @@ SHA256：
 - 推荐先备份/导出原版数据，卸载原版，再安装 Kelivo Plus。
 - 如需共存，请自行构建独立包名版本，例如把 Android `applicationId` 改为 `com.psyche.kelivo.plus`，并用自己的签名打包；共存版拥有独立应用数据，需要通过备份/导入迁移。
 - 覆盖安装旧 Kelivo Plus 二改版要求 APK 签名与已安装版本一致。
-- 如果 Android 提示“无法降级”，请确认当前已安装版本号是否高于 `1.1.17+4070`。
+- 如果 Android 提示“无法降级”，请确认当前已安装版本号是否高于 `1.1.17+4071`。
 - GitHub Token 不会随应用内置，需要在 MCP 编辑页自行配置。
-- App Control Agent 是高权限能力，仅建议对可信助手开启。
+- 神经权能网关是高权限能力，仅建议对可信助手开启。
 
 ## 验证
 
@@ -61,4 +62,4 @@ flutter analyze lib\core\services\mcp\kelivo_github\github_api_client.dart lib\c
 flutter test test\core\providers\mcp_provider_builtin_test.dart test\kelivo_github_mcp_server_test.dart
 ```
 
-历史整合测试还覆盖 Skills、Files、Images、本地混合搜索和 App Control 相关模块。完整 `flutter analyze` 可能受 vendored `dependencies/mcp_client/test` 上下文影响，需要单独处理 analyzer exclude 后再执行。
+历史整合测试还覆盖 Skills、Files、Images、本地混合搜索和神经权能网关相关模块。完整 `flutter analyze` 可能受 vendored `dependencies/mcp_client/test` 上下文影响，需要单独处理 analyzer exclude 后再执行。

@@ -292,7 +292,7 @@ String _toolTitleFor(
   if (localToolTitle != null) return localToolTitle;
   switch (name) {
     case AppControlToolNames.appControl:
-      return 'App Control Agent';
+      return '神经权能网关';
     case 'create_memory':
       return l10n.chatMessageWidgetCreateMemory;
     case 'edit_memory':

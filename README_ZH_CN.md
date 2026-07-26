@@ -8,8 +8,8 @@ Kelivo Plus 是基于 [Chevey339/kelivo](https://github.com/Chevey339/kelivo) �
 
 | 模块 | 原版 Kelivo | Kelivo Plus 二改版 |
 | --- | --- | --- |
-| 助手配置 | 主要依靠用户手动进入设置页编辑 | 新增 App Control Agent，允许获得授权的助手在对话中执行配置导入、修改与撤销 |
-| 助手权限 | 普通助手设置 | 新增“允许该助手控制 App 配置”的权限开关，默认关闭 |
+| 助手配置 | 主要依靠用户手动进入设置页编辑 | 新增神经权能网关，允许获得授权的助手在对话中执行配置导入、修改与撤销 |
+| 助手权限 | 普通助手设置 | 新增“允许该助手启用神经权能网关”的权限开关，默认关闭 |
 | 技能系统 | 无独立 Skills 工作流 | 新增技能模型、导入器、技能页、助手技能绑定和触发注入 |
 | MCP 工具 | 原有 MCP 接入与内置 Fetch | 新增内置 Files、Images、GitHub 等 MCP 服务，并优化工具折叠与中文说明 |
 | GitHub 工具 | 偏只读/基础能力 | 新增分组式写入工具，覆盖仓库、分支、文件、Issue、PR、Release、Actions、Secrets、Variables 等能力 |
@@ -19,11 +19,12 @@ Kelivo Plus 是基于 [Chevey339/kelivo](https://github.com/Chevey339/kelivo) �
 
 ## 核心功能
 
-### App Control Agent
+### 神经权能网关
 
-- 在助手设置中开启“允许该助手控制 App 配置”后，助手可以通过对话执行授权范围内的配置操作。
+- 在助手设置中开启“允许该助手启用神经权能网关”后，助手可以通过对话执行授权范围内的配置操作。
 - 支持把用户提供的指令、粘贴内容、文件内容、或“刚刚生成的内容”导入到指定位置。
 - 支持目标包括当前助手系统提示词、记忆、技能、指令注入、世界书、MCP 绑定、本地工具、快捷短语、搜索设置等。
+- 补齐删除、更新、列表/详情、世界书 entry 细粒度编辑、快捷短语排序、技能版本快照/回滚、批量导入导出和权限审计能力。
 - 支持执行结果回显与撤销，降低误操作风险。
 - 权限默认关闭，适合只给可信助手开启。
 
@@ -78,8 +79,8 @@ GitHub 工具按使用场景分组封装，不再把每个 API 端点都暴露�
 
 下载地址：
 
-- 最新 Release 页面：[Kelivo Plus 1.1.17+4070](https://github.com/MuMu-0604/kelivo/releases/tag/v1.1.17-plus.4070)
-- Android arm64 APK 直链：[Kelivo_android_1.1.17+4070_github-pr-review-comment-fix_fixedsign_arm64-v8a.apk](https://github.com/MuMu-0604/kelivo/releases/download/v1.1.17-plus.4070/Kelivo_android_1.1.17%2B4070_github-pr-review-comment-fix_fixedsign_arm64-v8a.apk)
+- 最新 Release 页面：[Kelivo Plus 1.1.17+4071](https://github.com/MuMu-0604/kelivo/releases/tag/v1.1.17-plus.4071)
+- Android 通用 APK 直链：[Kelivo_android_1.1.17+4071_neural-authority-gateway_fixedsign_universal.apk](https://github.com/MuMu-0604/kelivo/releases/download/v1.1.17-plus.4071/Kelivo_android_1.1.17%2B4071_neural-authority-gateway_fixedsign_universal.apk)
 
 本公开 APK 的 Android 包名仍为 `com.psyche.kelivo`，与原版 Kelivo 相同，因此需要注意：
 
@@ -110,10 +111,10 @@ GitHub 工具按使用场景分组封装，不再把每个 API 端点都暴露�
 3. 添加 OpenAI、Gemini、Anthropic 或其他兼容服务商。
 4. 回到聊天页选择模型并开始对话。
 
-### 开启 App Control Agent
+### 开启神经权能网关
 
 1. 进入助手设置。
-2. 找到权限开关“允许该助手控制 App 配置”。
+2. 找到权限开关“允许该助手启用神经权能网关”。
 3. 仅对可信助手开启。
 4. 在对话中直接提出配置需求，例如“把这段内容导入为当前助手的系统提示词”。
 5. 执行前根据提示确认，执行后可撤销最近一次变更。
@@ -162,7 +163,7 @@ flutter build apk --release --target-platform android-arm64
 
 ## 安全说明
 
-- App Control Agent 是高权限能力，默认关闭，建议只给可信助手开启。
+- 神经权能网关是高权限能力，默认关闭，建议只给可信助手开启；高风险覆盖、删除和批量导入操作会走确认与可撤销流程。
 - GitHub 写入工具会修改远程仓库，请使用最小权限 token。
 - Secrets、Token、Keystore、`android/key.properties`、构建缓存和 APK 产物不应提交到仓库。
 - 本项目保留 AGPL-3.0 协议要求，分发修改版时请同步提供对应源码。

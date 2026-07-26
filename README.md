@@ -10,8 +10,8 @@ Kelivo Plus is a modified open-source build based on [Chevey339/kelivo](https://
 
 | Area | Upstream Kelivo | Kelivo Plus |
 | --- | --- | --- |
-| Assistant configuration | Mostly manual settings pages | App Control Agent can import and edit configuration from chat after explicit assistant authorization |
-| Assistant permissions | Standard assistant settings | Adds an opt-in high-permission switch for app configuration control |
+| Assistant configuration | Mostly manual settings pages | 神经权能网关 can import and edit configuration from chat after explicit assistant authorization |
+| Assistant permissions | Standard assistant settings | Adds an opt-in 神经权能网关 permission switch for app configuration control |
 | Skills | No standalone reusable Skills workflow | Adds Skill model, importer, Skills page, assistant binding, and trigger-based injection |
 | Built-in MCP | MCP integration with built-in Fetch | Adds built-in Files, Images, GitHub, and in-memory MCP services |
 | GitHub tools | Read-oriented or basic tooling | Adds grouped write-capable tools for repos, files, issues, PRs, releases, actions, secrets, and variables |
@@ -21,11 +21,12 @@ Kelivo Plus is a modified open-source build based on [Chevey339/kelivo](https://
 
 ## Highlights
 
-### App Control Agent
+### 神经权能网关
 
-- Enable per assistant through the “Allow this assistant to control app configuration” switch.
+- Enable per assistant through the “Allow this assistant to use 神经权能网关” switch.
 - Import user-provided instructions, pasted text, shared files, or newly generated content into app configuration targets.
 - Supported targets include assistant system prompts, memory, Skills, instruction injection, world books, MCP bindings, local tools, quick phrases, and search settings.
+- Adds delete/update/list/detail operations, world-book entry editing, quick-phrase reorder, Skill version snapshots/rollback, batch import/export, and an audit log.
 - Recent changes can be undone.
 - Disabled by default and intended only for trusted assistants.
 
@@ -78,8 +79,8 @@ The wrapper layer also follows GitHub API constraints more strictly: empty repos
 
 Download links:
 
-- Latest Release page: [Kelivo Plus 1.1.17+4070](https://github.com/MuMu-0604/kelivo/releases/tag/v1.1.17-plus.4070)
-- Direct Android arm64 APK: [Kelivo_android_1.1.17+4070_github-pr-review-comment-fix_fixedsign_arm64-v8a.apk](https://github.com/MuMu-0604/kelivo/releases/download/v1.1.17-plus.4070/Kelivo_android_1.1.17%2B4070_github-pr-review-comment-fix_fixedsign_arm64-v8a.apk)
+- Latest Release page: [Kelivo Plus 1.1.17+4071](https://github.com/MuMu-0604/kelivo/releases/tag/v1.1.17-plus.4071)
+- Direct Android universal APK: [Kelivo_android_1.1.17+4071_neural-authority-gateway_fixedsign_universal.apk](https://github.com/MuMu-0604/kelivo/releases/download/v1.1.17-plus.4071/Kelivo_android_1.1.17%2B4071_neural-authority-gateway_fixedsign_universal.apk)
 
 The public APK keeps the Android package name `com.psyche.kelivo`, the same as upstream Kelivo, so Android treats it as the same app:
 
@@ -109,10 +110,10 @@ The current Release APK is a same-package build, not a coexistence build.
 2. Add a model provider such as OpenAI, Gemini, Anthropic, or another compatible endpoint.
 3. Select the model in chat and start using it.
 
-### Enable App Control Agent
+### Enable 神经权能网关
 
 1. Open an assistant settings page.
-2. Enable “Allow this assistant to control app configuration”.
+2. Enable “Allow this assistant to use 神经权能网关”.
 3. Ask the assistant to import or edit a supported configuration target from chat.
 4. Review the generated action and undo recent changes when needed.
 
@@ -149,7 +150,7 @@ The repository does not include signing secrets. Configure your own `android/key
 
 ## Security Notes
 
-- App Control Agent is a high-permission capability and is disabled by default.
+- 神经权能网关 is a high-permission capability and is disabled by default. Destructive, overwrite, and batch import operations remain confirmation-driven and undoable where supported.
 - GitHub write tools can modify remote repositories; use least-privilege tokens.
 - Do not commit tokens, secrets, keystores, `android/key.properties`, build caches, or APK outputs.
 - AGPL-3.0 obligations apply when distributing modified builds.

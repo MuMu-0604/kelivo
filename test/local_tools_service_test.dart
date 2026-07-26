@@ -43,7 +43,7 @@ void main() {
       expect(assistant.skillIds, isEmpty);
     });
 
-    test('assistant defaults to app control disabled', () {
+    test('assistant defaults to 神经权能网关 disabled', () {
       const assistant = Assistant(id: 'a1', name: 'Assistant');
 
       expect(assistant.appControlEnabled, isFalse);
@@ -112,7 +112,7 @@ void main() {
       expect(decoded.skillIds, const ['skill-a', 'skill-b']);
     });
 
-    test('assistant json round trips app control permission', () {
+    test('assistant json round trips 神经权能网关 permission', () {
       const assistant = Assistant(
         id: 'a1',
         name: 'Assistant',

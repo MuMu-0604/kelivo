@@ -1,5 +1,52 @@
 import 'dart:convert';
 
+class SkillVersion {
+  final String id;
+  final String name;
+  final String description;
+  final String content;
+  final List<String> triggerKeywords;
+  final int priority;
+  final DateTime createdAt;
+
+  const SkillVersion({
+    required this.id,
+    required this.name,
+    this.description = '',
+    required this.content,
+    this.triggerKeywords = const <String>[],
+    this.priority = 0,
+    required this.createdAt,
+  });
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'name': name,
+    'description': description,
+    'content': content,
+    'triggerKeywords': triggerKeywords,
+    'priority': priority,
+    'createdAt': createdAt.toIso8601String(),
+  };
+
+  factory SkillVersion.fromJson(Map<String, dynamic> json) {
+    final now = DateTime.now();
+    return SkillVersion(
+      id: (json['id'] as String?) ?? '',
+      name: (json['name'] as String?) ?? '',
+      description: (json['description'] as String?) ?? '',
+      content: (json['content'] as String?) ?? '',
+      triggerKeywords:
+          (json['triggerKeywords'] as List?)?.cast<String>() ??
+          const <String>[],
+      priority: (json['priority'] as num?)?.toInt() ?? 0,
+      createdAt: json['createdAt'] is String
+          ? DateTime.tryParse(json['createdAt'] as String) ?? now
+          : now,
+    );
+  }
+}
+
 class Skill {
   final String id;
   final String name;
@@ -11,6 +58,7 @@ class Skill {
   final String? sourcePath;
   final DateTime createdAt;
   final DateTime updatedAt;
+  final List<SkillVersion> versions;
 
   const Skill({
     required this.id,
@@ -23,6 +71,7 @@ class Skill {
     this.sourcePath,
     required this.createdAt,
     required this.updatedAt,
+    this.versions = const <SkillVersion>[],
   });
 
   Skill copyWith({
@@ -36,6 +85,7 @@ class Skill {
     String? sourcePath,
     DateTime? createdAt,
     DateTime? updatedAt,
+    List<SkillVersion>? versions,
     bool clearSourcePath = false,
   }) {
     return Skill(
@@ -49,6 +99,7 @@ class Skill {
       sourcePath: clearSourcePath ? null : (sourcePath ?? this.sourcePath),
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      versions: versions ?? this.versions,
     );
   }
 
@@ -63,6 +114,7 @@ class Skill {
     'sourcePath': sourcePath,
     'createdAt': createdAt.toIso8601String(),
     'updatedAt': updatedAt.toIso8601String(),
+    'versions': versions.map((e) => e.toJson()).toList(),
   };
 
   factory Skill.fromJson(Map<String, dynamic> json) {
@@ -85,6 +137,13 @@ class Skill {
       sourcePath: json['sourcePath'] as String?,
       createdAt: parseDate(json['createdAt']),
       updatedAt: parseDate(json['updatedAt']),
+      versions:
+          (json['versions'] as List?)
+              ?.whereType<Map>()
+              .map((e) => SkillVersion.fromJson(e.cast<String, dynamic>()))
+              .where((version) => version.id.isNotEmpty)
+              .toList(growable: false) ??
+          const <SkillVersion>[],
     );
   }
 
