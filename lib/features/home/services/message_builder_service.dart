@@ -528,7 +528,10 @@ class MessageBuilderService {
       apiMessages.insert(0, {'role': 'system', 'content': sys});
     }
     if (assistant?.appControlEnabled == true) {
-      _appendToSystemMessage(apiMessages, AppControlService.systemPrompt);
+      _appendToSystemMessage(
+        apiMessages,
+        AppControlService.systemPromptForAssistant(assistant!),
+      );
     }
   }
 

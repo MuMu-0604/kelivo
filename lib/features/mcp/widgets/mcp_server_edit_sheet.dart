@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import 'dart:math' as math;
+import 'package:permission_handler/permission_handler.dart';
 import '../../../core/services/haptics.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../core/providers/mcp_provider.dart';
@@ -54,10 +55,14 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
   bool _enabled = true;
   final _nameCtrl = TextEditingController();
   final _githubTokenCtrl = TextEditingController();
+  final _imagesApiUrlCtrl = TextEditingController();
+  final _imagesApiKeyCtrl = TextEditingController();
   McpTransportType _transport = McpTransportType.http;
   final _urlCtrl = TextEditingController();
   final List<_HeaderEntry> _headers = [];
   bool _githubTokenObscured = true;
+  bool _imagesApiKeyObscured = true;
+  PermissionStatus? _filePermissionStatus;
 
   @override
   void initState() {
@@ -70,6 +75,13 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
       _nameCtrl.text = server.name;
       if (context.read<McpProvider>().isBuiltinGithubServer(server)) {
         _githubTokenCtrl.text = context.read<McpProvider>().githubToken;
+      }
+      if (context.read<McpProvider>().isBuiltinImagesServer(server)) {
+        _imagesApiUrlCtrl.text = context.read<McpProvider>().imagesApiBaseUrl;
+        _imagesApiKeyCtrl.text = context.read<McpProvider>().imagesApiKey;
+      }
+      if (context.read<McpProvider>().isBuiltinFilesServer(server)) {
+        _refreshFilePermissionStatus();
       }
       _transport = server.transport;
       _urlCtrl.text = server.url;
@@ -88,12 +100,29 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
     if (mounted) setState(() {});
   }
 
+  Future<void> _refreshFilePermissionStatus() async {
+    final status = await Permission.manageExternalStorage.status;
+    if (!mounted) return;
+    setState(() => _filePermissionStatus = status);
+  }
+
+  Future<void> _requestFilePermission() async {
+    final status = await Permission.manageExternalStorage.request();
+    if (!mounted) return;
+    setState(() => _filePermissionStatus = status);
+    if (!status.isGranted) {
+      await openAppSettings();
+    }
+  }
+
   @override
   void dispose() {
     _tab?.removeListener(_onTabChanged);
     _tab?.dispose();
     _nameCtrl.dispose();
     _githubTokenCtrl.dispose();
+    _imagesApiUrlCtrl.dispose();
+    _imagesApiKeyCtrl.dispose();
     _urlCtrl.dispose();
     for (final h in _headers) {
       h.dispose();
@@ -234,6 +263,12 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
     final isBuiltinGithub =
         server != null &&
         context.read<McpProvider>().isBuiltinGithubServer(server);
+    final isBuiltinFiles =
+        server != null &&
+        context.read<McpProvider>().isBuiltinFilesServer(server);
+    final isBuiltinImages =
+        server != null &&
+        context.read<McpProvider>().isBuiltinImagesServer(server);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -271,81 +306,9 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
                   ],
                 ),
               ),
-              if (isBuiltinGithub)
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(Lucide.KeyRound, size: 16, color: cs.primary),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              'GitHub Token',
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: AppFontWeights.medium,
-                              ),
-                            ),
-                          ),
-                          Text(
-                            context.read<McpProvider>().hasGithubToken
-                                ? '已配置'
-                                : '未配置',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: context.read<McpProvider>().hasGithubToken
-                                  ? Colors.green
-                                  : cs.onSurface.withValues(alpha: 0.55),
-                              fontWeight: AppFontWeights.medium,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      _inputRow(
-                        label: '访问令牌',
-                        controller: _githubTokenCtrl,
-                        hint: 'ghp_... / github_pat_...',
-                        obscureText: _githubTokenObscured,
-                        suffixIcon: IconButton(
-                          tooltip: _githubTokenObscured
-                              ? '显示 Token'
-                              : '隐藏 Token',
-                          icon: Icon(
-                            _githubTokenObscured ? Lucide.Eye : Lucide.EyeOff,
-                            size: 18,
-                          ),
-                          onPressed: () => setState(
-                            () => _githubTokenObscured = !_githubTokenObscured,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              '用于 @kelivo/github 请求认证；留空保存会清除 Token。',
-                              style: TextStyle(
-                                fontSize: 12,
-                                height: 1.35,
-                                color: cs.onSurface.withValues(alpha: 0.58),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          TextButton(
-                            onPressed: () => setState(_githubTokenCtrl.clear),
-                            child: const Text('清除'),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
+              if (isBuiltinGithub) _builtinGithubSettings(),
+              if (isBuiltinFiles) _builtinFilesSettings(),
+              if (isBuiltinImages) _builtinImagesSettings(),
             ],
           )
         else ...[
@@ -390,6 +353,252 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
           _headersEditor(),
         ],
       ],
+    );
+  }
+
+  Widget _builtinSectionHeader({
+    required IconData icon,
+    required String title,
+    String? status,
+    Color? statusColor,
+  }) {
+    final cs = Theme.of(context).colorScheme;
+    return Row(
+      children: [
+        Icon(icon, size: 16, color: cs.primary),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            title,
+            style: TextStyle(fontSize: 13, fontWeight: AppFontWeights.medium),
+          ),
+        ),
+        if (status != null)
+          Text(
+            status,
+            style: TextStyle(
+              fontSize: 12,
+              color: statusColor ?? cs.onSurface.withValues(alpha: 0.55),
+              fontWeight: AppFontWeights.medium,
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _builtinGithubSettings() {
+    final cs = Theme.of(context).colorScheme;
+    final mcp = context.read<McpProvider>();
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _builtinSectionHeader(
+            icon: Lucide.KeyRound,
+            title: 'GitHub Token',
+            status: mcp.hasGithubToken ? '已配置' : '未配置',
+            statusColor: mcp.hasGithubToken
+                ? Colors.green
+                : cs.onSurface.withValues(alpha: 0.55),
+          ),
+          const SizedBox(height: 8),
+          _inputRow(
+            label: '访问令牌',
+            controller: _githubTokenCtrl,
+            hint: 'ghp_... / github_pat_...',
+            obscureText: _githubTokenObscured,
+            suffixIcon: IconButton(
+              tooltip: _githubTokenObscured ? '显示 Token' : '隐藏 Token',
+              icon: Icon(
+                _githubTokenObscured ? Lucide.Eye : Lucide.EyeOff,
+                size: 18,
+              ),
+              onPressed: () =>
+                  setState(() => _githubTokenObscured = !_githubTokenObscured),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  '用于 @kelivo/github 请求认证；留空保存会清除 Token。',
+                  style: TextStyle(
+                    fontSize: 12,
+                    height: 1.35,
+                    color: cs.onSurface.withValues(alpha: 0.58),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              TextButton(
+                onPressed: () => setState(_githubTokenCtrl.clear),
+                child: const Text('清除'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _builtinImagesSettings() {
+    final cs = Theme.of(context).colorScheme;
+    final mcp = context.read<McpProvider>();
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _builtinSectionHeader(
+            icon: Lucide.Image,
+            title: '图片生成配置',
+            status: mcp.hasImagesConfig ? '已配置' : '未配置',
+            statusColor: mcp.hasImagesConfig
+                ? Colors.green
+                : cs.onSurface.withValues(alpha: 0.55),
+          ),
+          const SizedBox(height: 8),
+          _inputRow(
+            label: 'API URL',
+            controller: _imagesApiUrlCtrl,
+            hint: 'https://api.openai.com/v1',
+          ),
+          const SizedBox(height: 10),
+          _inputRow(
+            label: 'API Key',
+            controller: _imagesApiKeyCtrl,
+            hint: 'sk-... / provider key',
+            obscureText: _imagesApiKeyObscured,
+            suffixIcon: IconButton(
+              tooltip: _imagesApiKeyObscured ? '显示 Key' : '隐藏 Key',
+              icon: Icon(
+                _imagesApiKeyObscured ? Lucide.Eye : Lucide.EyeOff,
+                size: 18,
+              ),
+              onPressed: () => setState(
+                () => _imagesApiKeyObscured = !_imagesApiKeyObscured,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  '用于 @kelivo/images 生成图片；助手将从这里读取 URL 和 Key，不再通过对话收集。',
+                  style: TextStyle(
+                    fontSize: 12,
+                    height: 1.35,
+                    color: cs.onSurface.withValues(alpha: 0.58),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              TextButton(
+                onPressed: () => setState(_imagesApiKeyCtrl.clear),
+                child: const Text('清除 Key'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _builtinFilesSettings() {
+    final cs = Theme.of(context).colorScheme;
+    final isGranted = _filePermissionStatus?.isGranted == true;
+
+    Widget step(String title, String body) {
+      return Padding(
+        padding: const EdgeInsets.only(top: 8),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 5,
+              height: 5,
+              margin: const EdgeInsets.only(top: 7, right: 8),
+              decoration: BoxDecoration(
+                color: cs.primary.withValues(alpha: 0.65),
+                shape: BoxShape.circle,
+              ),
+            ),
+            Expanded(
+              child: RichText(
+                text: TextSpan(
+                  style: TextStyle(
+                    fontSize: 12,
+                    height: 1.35,
+                    color: cs.onSurface.withValues(alpha: 0.64),
+                  ),
+                  children: [
+                    TextSpan(
+                      text: '$title：',
+                      style: TextStyle(
+                        fontWeight: AppFontWeights.medium,
+                        color: cs.onSurface.withValues(alpha: 0.78),
+                      ),
+                    ),
+                    TextSpan(text: body),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _builtinSectionHeader(
+            icon: isGranted ? Lucide.CheckCircle : Lucide.Folder,
+            title: '文件权限引导',
+            status: isGranted ? '已授权' : '未授权',
+            statusColor: isGranted
+                ? Colors.green
+                : cs.onSurface.withValues(alpha: 0.55),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            isGranted
+                ? '@kelivo/files 已获得所有文件访问权限，可以访问 /storage/emulated/0 下的大多数可见文件。'
+                : 'Android 11+ 需要授予“所有文件访问权限”，@kelivo/files 才能稳定访问手机可见目录。',
+            style: TextStyle(
+              fontSize: 12,
+              height: 1.35,
+              color: cs.onSurface.withValues(alpha: 0.64),
+            ),
+          ),
+          step('默认工作区', '保持 phone_storage，也就是 /storage/emulated/0，除非你明确要求切换。'),
+          step('授权方式', '点击按钮后在系统页面找到 Kelivo，打开“允许管理所有文件”。'),
+          step('能力边界', '这是共享存储权限，不是 root 权限，系统保护目录和其它 App 私有目录仍受限制。'),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: FilledButton.icon(
+                  onPressed: _requestFilePermission,
+                  icon: Icon(isGranted ? Lucide.RefreshCw : Lucide.Settings),
+                  label: Text(isGranted ? '重新检查权限' : '打开权限设置'),
+                ),
+              ),
+              const SizedBox(width: 10),
+              OutlinedButton.icon(
+                onPressed: _refreshFilePermissionStatus,
+                icon: const Icon(Lucide.RotateCw, size: 16),
+                label: const Text('刷新'),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
@@ -465,6 +674,12 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
       await mcp.updateServer(old.copyWith(enabled: _enabled));
       if (mcp.isBuiltinGithubServer(old)) {
         await mcp.updateGithubToken(_githubTokenCtrl.text);
+      }
+      if (mcp.isBuiltinImagesServer(old)) {
+        await mcp.updateImagesConfig(
+          apiBaseUrl: _imagesApiUrlCtrl.text,
+          apiKey: _imagesApiKeyCtrl.text,
+        );
       }
       if (mounted) Navigator.of(context).pop();
       return;

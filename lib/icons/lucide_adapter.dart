@@ -40,6 +40,7 @@ class Lucide {
   static const IconData Boxes = lucide.LucideIcons.boxes;
   static const IconData Volume2 = lucide.LucideIcons.volume2;
   static const IconData Terminal = lucide.LucideIcons.terminal;
+  static const IconData Server = lucide.LucideIcons.server;
   static const IconData Database = lucide.LucideIcons.database;
   static const IconData HardDrive = lucide.LucideIcons.hardDrive;
   static const IconData BadgeInfo = lucide.LucideIcons.badgeInfo;
@@ -101,6 +102,10 @@ class Lucide {
   static const IconData CircleX = lucide.LucideIcons.circleX;
   static const IconData Link2 = lucide.LucideIcons.link2;
   static const IconData Shield = lucide.LucideIcons.shield;
+  static const IconData ShieldCheck = lucide.LucideIcons.shieldCheck;
+  static const IconData ShieldOff = lucide.LucideIcons.shieldOff;
+  static const IconData Unlock = lucide.LucideIcons.lockOpen;
+  static const IconData Power = lucide.LucideIcons.power;
   static const IconData Compass = lucide.LucideIcons.compass;
   static const IconData ArrowDown = lucide.LucideIcons.arrowDown;
   static const IconData Edit2 = lucide.LucideIcons.squarePen;
@@ -182,6 +187,7 @@ class Lucide {
   static const IconData Folder = lucide.LucideIcons.folder;
   static const IconData CornerDownLeft = lucide.LucideIcons.cornerDownLeft;
   static const IconData package2 = lucide.LucideIcons.package2;
+  static const IconData Package = lucide.LucideIcons.package;
   static const IconData workflow = lucide.LucideIcons.workflow;
   static const IconData clock = lucide.LucideIcons.clock;
   static const IconData Wallet = lucide.LucideIcons.walletMinimal;

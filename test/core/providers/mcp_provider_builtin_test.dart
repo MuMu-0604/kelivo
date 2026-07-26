@@ -102,6 +102,60 @@ void main() {
       expect(prefs.containsKey('mcp_github_token_v1'), isFalse);
     });
 
+    test('persists images API configuration', () async {
+      SharedPreferences.setMockInitialValues(const {});
+
+      final provider = McpProvider();
+      addTearDown(provider.dispose);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(provider.hasImagesConfig, isFalse);
+      expect(provider.imagesApiBaseUrl, 'https://api.openai.com/v1');
+
+      await provider.updateImagesConfig(
+        apiBaseUrl: '  https://images.example.com/v1  ',
+        apiKey: '  image-secret  ',
+      );
+
+      expect(provider.hasImagesConfig, isTrue);
+      expect(provider.imagesApiBaseUrl, 'https://images.example.com/v1');
+      expect(provider.imagesApiKey, 'image-secret');
+      final prefs = await SharedPreferences.getInstance();
+      expect(
+        prefs.getString('mcp_images_api_base_url_v1'),
+        'https://images.example.com/v1',
+      );
+      expect(prefs.getString('mcp_images_api_key_v1'), 'image-secret');
+
+      await provider.updateImagesConfig(apiBaseUrl: '', apiKey: '');
+
+      expect(provider.hasImagesConfig, isFalse);
+      expect(provider.imagesApiBaseUrl, 'https://api.openai.com/v1');
+      expect(
+        prefs.getString('mcp_images_api_base_url_v1'),
+        'https://api.openai.com/v1',
+      );
+      expect(prefs.containsKey('mcp_images_api_key_v1'), isFalse);
+    });
+
+    test('auto-connects enabled images built-in on load', () async {
+      SharedPreferences.setMockInitialValues({
+        'mcp_servers_v1': '''
+[
+  {"id":"kelivo_images","enabled":true,"name":"@kelivo/images","transport":"inmemory","tools":[]}
+]
+''',
+      });
+
+      final provider = McpProvider();
+      addTearDown(provider.dispose);
+
+      await _pumpUntil(() => provider.isConnected('kelivo_images'));
+
+      expect(provider.isConnected('kelivo_images'), isTrue);
+      expect(provider.getById('kelivo_images')!.tools, isNotEmpty);
+    });
+
     test('marks grouped github write tools as requiring approval', () async {
       SharedPreferences.setMockInitialValues(const {});
 
@@ -122,4 +176,14 @@ void main() {
       expect(byName['github_secrets_write']!.needsApproval, isTrue);
     });
   });
+}
+
+Future<void> _pumpUntil(
+  bool Function() predicate, {
+  Duration timeout = const Duration(seconds: 2),
+}) async {
+  final deadline = DateTime.now().add(timeout);
+  while (!predicate() && DateTime.now().isBefore(deadline)) {
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+  }
 }

@@ -272,14 +272,12 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
                     .updateAssistant(a.copyWith(streamOutput: v)),
               ),
               _iosDivider(context),
-              _iosSwitchRow(
+              _iosNavRow(
                 context,
                 icon: Lucide.Shield,
                 label: '神经权能网关',
-                value: a.appControlEnabled,
-                onChanged: (v) => context
-                    .read<AssistantProvider>()
-                    .updateAssistant(a.copyWith(appControlEnabled: v)),
+                detailText: _appControlSummary(a),
+                onTap: () => _showAppControlPolicySheet(context, a),
               ),
             ],
           ),
@@ -1176,6 +1174,607 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
           ),
         );
       },
+    );
+  }
+
+  String _appControlSummary(Assistant a) {
+    if (!a.appControlEnabled) return '已关闭';
+    final enabled = a.appControlPolicy.enabledTargetCount;
+    final approvals = a.appControlPolicy.approvalRequiredTargetCount;
+    if (enabled == 0) return '无已启用功能';
+    return '$enabled 项，$approvals 项审批';
+  }
+
+  Future<void> _showAppControlPolicySheet(
+    BuildContext context,
+    Assistant a,
+  ) async {
+    final cs = Theme.of(context).colorScheme;
+    await showModalBottomSheet(
+      context: context,
+      backgroundColor: cs.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+      ),
+      isScrollControlled: true,
+      builder: (ctx) => DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.88,
+        minChildSize: 0.55,
+        maxChildSize: 0.96,
+        builder: (context, scrollController) => _AppControlPolicySheet(
+          assistantId: a.id,
+          scrollController: scrollController,
+        ),
+      ),
+    );
+  }
+}
+
+class _AppControlCapabilityMeta {
+  const _AppControlCapabilityMeta({
+    required this.target,
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.highRisk,
+  });
+
+  final String target;
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final bool highRisk;
+}
+
+const List<_AppControlCapabilityMeta> _appControlCapabilityMetas = [
+  _AppControlCapabilityMeta(
+    target: AppControlPolicy.currentAssistantSettings,
+    title: '助手配置',
+    subtitle: '名称、模型、温度、上下文和搜索记忆开关',
+    icon: Lucide.Settings2,
+    highRisk: true,
+  ),
+  _AppControlCapabilityMeta(
+    target: AppControlPolicy.currentAssistantSystemPrompt,
+    title: '系统提示词',
+    subtitle: '追加、覆盖、导入或导出当前助手提示词',
+    icon: Lucide.FileText,
+    highRisk: true,
+  ),
+  _AppControlCapabilityMeta(
+    target: AppControlPolicy.currentAssistantMemory,
+    title: '记忆',
+    subtitle: '创建、更新、删除或导入导出助手记忆',
+    icon: Lucide.Brain,
+    highRisk: false,
+  ),
+  _AppControlCapabilityMeta(
+    target: AppControlPolicy.currentAssistantSkills,
+    title: '技能',
+    subtitle: '创建、绑定、版本快照、回滚和导入导出技能',
+    icon: Lucide.Sparkles,
+    highRisk: false,
+  ),
+  _AppControlCapabilityMeta(
+    target: AppControlPolicy.quickPhrase,
+    title: '快捷短语',
+    subtitle: '创建、更新、排序和删除快捷短语',
+    icon: Lucide.Zap,
+    highRisk: false,
+  ),
+  _AppControlCapabilityMeta(
+    target: AppControlPolicy.worldBook,
+    title: '世界书',
+    subtitle: '管理书本、条目和助手激活状态',
+    icon: Lucide.BookOpen,
+    highRisk: false,
+  ),
+  _AppControlCapabilityMeta(
+    target: AppControlPolicy.instructionInjection,
+    title: '指令注入',
+    subtitle: '创建、启停、更新或删除指令卡片',
+    icon: Lucide.Bot,
+    highRisk: true,
+  ),
+  _AppControlCapabilityMeta(
+    target: AppControlPolicy.currentAssistantLocalTools,
+    title: '本地工具绑定',
+    subtitle: '绑定或解绑时间、剪贴板、TTS、计算器等工具',
+    icon: Lucide.Wrench,
+    highRisk: false,
+  ),
+  _AppControlCapabilityMeta(
+    target: AppControlPolicy.currentAssistantMcp,
+    title: '助手 MCP 绑定',
+    subtitle: '为当前助手绑定或解绑 MCP 服务器',
+    icon: Lucide.Terminal,
+    highRisk: true,
+  ),
+  _AppControlCapabilityMeta(
+    target: AppControlPolicy.mcpServer,
+    title: 'MCP 服务器配置',
+    subtitle: '创建、更新、删除 MCP 服务器和审批规则',
+    icon: Lucide.Server,
+    highRisk: true,
+  ),
+  _AppControlCapabilityMeta(
+    target: AppControlPolicy.searchSettings,
+    title: '搜索设置',
+    subtitle: '启停搜索、更新搜索服务和全局配置',
+    icon: Lucide.Search,
+    highRisk: true,
+  ),
+  _AppControlCapabilityMeta(
+    target: AppControlPolicy.appBundle,
+    title: '迁移包',
+    subtitle: '导入或导出助手能力配置包',
+    icon: Lucide.Package,
+    highRisk: true,
+  ),
+  _AppControlCapabilityMeta(
+    target: AppControlPolicy.auditLog,
+    title: '审计日志',
+    subtitle: '查看最近网关操作和撤销栈状态',
+    icon: Lucide.History,
+    highRisk: false,
+  ),
+];
+
+class _AppControlPolicySheet extends StatelessWidget {
+  const _AppControlPolicySheet({
+    required this.assistantId,
+    required this.scrollController,
+  });
+
+  final String assistantId;
+  final ScrollController scrollController;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    final assistant = context.watch<AssistantProvider>().getById(assistantId)!;
+    final policy = assistant.appControlPolicy;
+    final enabledCount = assistant.appControlEnabled
+        ? policy.enabledTargetCount
+        : 0;
+    final approvalCount = assistant.appControlEnabled
+        ? policy.approvalRequiredTargetCount
+        : 0;
+
+    Future<void> updatePolicy(AppControlPolicy next) {
+      return context.read<AssistantProvider>().updateAssistant(
+        assistant.copyWith(
+          appControlEnabled: next.enabled,
+          appControlPolicy: next,
+        ),
+      );
+    }
+
+    Future<void> setEnabled(bool value) {
+      final next = policy.targets.isEmpty
+          ? AppControlPolicy.safeDefault(enabled: value)
+          : policy.copyWith(enabled: value);
+      return updatePolicy(next);
+    }
+
+    return SafeArea(
+      top: false,
+      child: Column(
+        children: [
+          Container(
+            width: 36,
+            height: 4,
+            margin: const EdgeInsets.only(top: 10, bottom: 10),
+            decoration: BoxDecoration(
+              color: cs.onSurface.withValues(alpha: 0.18),
+              borderRadius: BorderRadius.circular(999),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 0, 10, 8),
+            child: Row(
+              children: [
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: cs.primary.withValues(alpha: isDark ? 0.18 : 0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  alignment: Alignment.center,
+                  child: Icon(Lucide.Shield, size: 20, color: cs.primary),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '神经权能网关',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: AppFontWeights.emphasis,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        assistant.appControlEnabled
+                            ? '已启用 $enabledCount 项功能，$approvalCount 项需要审批'
+                            : '已关闭，不会向模型暴露网关工具',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          color: cs.onSurface.withValues(alpha: 0.62),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                _TactileIconButton(
+                  icon: Lucide.X,
+                  color: cs.onSurface,
+                  size: 21,
+                  onTap: () => Navigator.of(context).maybePop(),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: ListView(
+              controller: scrollController,
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
+              children: [
+                _iosSectionCard(
+                  children: [
+                    _iosSwitchRow(
+                      context,
+                      icon: Lucide.Power,
+                      label: '启用神经权能网关',
+                      value: assistant.appControlEnabled,
+                      onChanged: setEnabled,
+                    ),
+                    _iosDivider(context),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(60, 4, 14, 10),
+                      child: Text(
+                        '总开关关闭时，助手不会看到 kelivo_app_control 工具；开启后仍会受下方功能权限和审批策略限制。',
+                        style: TextStyle(
+                          color: cs.onSurface.withValues(alpha: 0.58),
+                          fontSize: 12.5,
+                          height: 1.35,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _AppControlPresetButton(
+                        label: '安全默认',
+                        icon: Lucide.ShieldCheck,
+                        onTap: () => updatePolicy(
+                          AppControlPolicy.safeDefault(enabled: true),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _AppControlPresetButton(
+                        label: '全部关闭',
+                        icon: Lucide.ShieldOff,
+                        onTap: () => updatePolicy(
+                          AppControlPolicy.safeDefault(enabled: false),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _AppControlPresetButton(
+                        label: '完整权限',
+                        icon: Lucide.Unlock,
+                        onTap: () async {
+                          final ok = await _confirmFullAccess(context);
+                          if (ok == true && context.mounted) {
+                            await updatePolicy(AppControlPolicy.fullAccess());
+                          }
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  '功能权限',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: AppFontWeights.semibold,
+                    color: cs.onSurface.withValues(alpha: 0.64),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                _iosSectionCard(
+                  children: [
+                    for (
+                      var i = 0;
+                      i < _appControlCapabilityMetas.length;
+                      i++
+                    ) ...[
+                      _AppControlCapabilityRow(
+                        meta: _appControlCapabilityMetas[i],
+                        assistantEnabled: assistant.appControlEnabled,
+                        policy: policy,
+                        onChanged: updatePolicy,
+                      ),
+                      if (i != _appControlCapabilityMetas.length - 1)
+                        _iosDivider(context),
+                    ],
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<bool?> _confirmFullAccess(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        backgroundColor: cs.surface,
+        title: const Text('启用完整权限？'),
+        content: const Text('这会开放所有神经权能网关功能。高风险目标和删除、覆盖、导入类操作仍会强制审批。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('启用'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AppControlPresetButton extends StatelessWidget {
+  const _AppControlPresetButton({
+    required this.label,
+    required this.icon,
+    required this.onTap,
+  });
+
+  final String label;
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return _TactileRow(
+      onTap: onTap,
+      pressedScale: 0.98,
+      builder: (pressed) {
+        final bg = isDark ? Colors.white10 : const Color(0xFFF2F3F5);
+        final overlay = isDark
+            ? Colors.white.withValues(alpha: 0.06)
+            : Colors.black.withValues(alpha: 0.05);
+        return AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+          decoration: BoxDecoration(
+            color: pressed ? Color.alphaBlend(overlay, bg) : bg,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: cs.outlineVariant.withValues(alpha: 0.24),
+            ),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 16, color: cs.onSurface.withValues(alpha: 0.76)),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: AppFontWeights.semibold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _AppControlCapabilityRow extends StatelessWidget {
+  const _AppControlCapabilityRow({
+    required this.meta,
+    required this.assistantEnabled,
+    required this.policy,
+    required this.onChanged,
+  });
+
+  final _AppControlCapabilityMeta meta;
+  final bool assistantEnabled;
+  final AppControlPolicy policy;
+  final ValueChanged<AppControlPolicy> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final defaults = AppControlPolicy.safeDefault().targets;
+    final targetPolicy =
+        policy.targets[meta.target] ??
+        defaults[meta.target] ??
+        const AppControlTargetPolicy();
+    final enabled = assistantEnabled && targetPolicy.enabled;
+    final approvalForced = AppControlPolicy.forceApprovalTargets.contains(
+      meta.target,
+    );
+    final approvalValue = approvalForced || targetPolicy.approvalRequired;
+    final textAlpha = assistantEnabled ? 0.92 : 0.42;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          SizedBox(
+            width: 36,
+            child: Icon(
+              meta.icon,
+              size: 20,
+              color: cs.onSurface.withValues(alpha: textAlpha),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        meta.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 14.5,
+                          color: cs.onSurface.withValues(alpha: textAlpha),
+                          fontWeight: AppFontWeights.semibold,
+                        ),
+                      ),
+                    ),
+                    if (meta.highRisk)
+                      Container(
+                        margin: const EdgeInsets.only(left: 6),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: cs.error.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Text(
+                          '高风险',
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            color: cs.error,
+                            fontWeight: AppFontWeights.semibold,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  meta.subtitle,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12,
+                    height: 1.25,
+                    color: cs.onSurface.withValues(
+                      alpha: assistantEnabled ? 0.56 : 0.34,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 6,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    _MiniSwitchLabel(
+                      label: '功能',
+                      value: enabled,
+                      enabled: assistantEnabled,
+                      onChanged: (value) => onChanged(
+                        policy.setTargetEnabled(meta.target, value),
+                      ),
+                    ),
+                    _MiniSwitchLabel(
+                      label: approvalForced ? '强制审批' : '审批',
+                      value: approvalValue,
+                      enabled:
+                          assistantEnabled &&
+                          targetPolicy.enabled &&
+                          !approvalForced,
+                      onChanged: (value) => onChanged(
+                        policy.setTargetApprovalRequired(meta.target, value),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MiniSwitchLabel extends StatelessWidget {
+  const _MiniSwitchLabel({
+    required this.label,
+    required this.value,
+    required this.enabled,
+    required this.onChanged,
+  });
+
+  final String label;
+  final bool value;
+  final bool enabled;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Opacity(
+      opacity: enabled ? 1 : 0.52,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11.5,
+              color: cs.onSurface.withValues(alpha: 0.62),
+            ),
+          ),
+          const SizedBox(width: 5),
+          Transform.scale(
+            scale: 0.76,
+            child: IosSwitch(
+              value: value,
+              semanticLabel: label,
+              onChanged: enabled ? onChanged : null,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

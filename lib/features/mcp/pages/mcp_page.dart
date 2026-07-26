@@ -11,7 +11,6 @@ import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../core/services/haptics.dart';
 import '../../../theme/app_font_weights.dart';
-import 'package:permission_handler/permission_handler.dart';
 
 class McpPage extends StatelessWidget {
   const McpPage({super.key});
@@ -261,12 +260,6 @@ class McpPage extends StatelessWidget {
       );
     }
 
-    Future<void> openFilePermissionGuide() async {
-      await Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => const _FilePermissionGuidePage()),
-      );
-    }
-
     return Scaffold(
       appBar: AppBar(
         leading: Tooltip(
@@ -280,16 +273,6 @@ class McpPage extends StatelessWidget {
         ),
         title: Text(l10n.mcpAssistantSheetTitle),
         actions: [
-          Tooltip(
-            message: '文件权限引导',
-            child: _TactileIconButton(
-              icon: Lucide.Folder,
-              color: cs.onSurface,
-              size: 22,
-              onTap: openFilePermissionGuide,
-            ),
-          ),
-          const SizedBox(width: 12),
           Tooltip(
             message: 'MCP 调用日志',
             child: _TactileIconButton(
@@ -833,156 +816,6 @@ class _McpCallLogCard extends StatelessWidget {
   static String _formatLogTime(DateTime dt) {
     String two(int value) => value.toString().padLeft(2, '0');
     return '${two(dt.hour)}:${two(dt.minute)}:${two(dt.second)}';
-  }
-}
-
-class _FilePermissionGuidePage extends StatefulWidget {
-  const _FilePermissionGuidePage();
-
-  @override
-  State<_FilePermissionGuidePage> createState() =>
-      _FilePermissionGuidePageState();
-}
-
-class _FilePermissionGuidePageState extends State<_FilePermissionGuidePage> {
-  PermissionStatus? _status;
-
-  @override
-  void initState() {
-    super.initState();
-    _refreshStatus();
-  }
-
-  Future<void> _refreshStatus() async {
-    final status = await Permission.manageExternalStorage.status;
-    if (!mounted) return;
-    setState(() => _status = status);
-  }
-
-  Future<void> _requestPermission() async {
-    final status = await Permission.manageExternalStorage.request();
-    if (!mounted) return;
-    setState(() => _status = status);
-    if (!status.isGranted) {
-      await openAppSettings();
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final isGranted = _status?.isGranted == true;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    Widget step(String title, String body) {
-      return Container(
-        width: double.infinity,
-        margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: isDark ? Colors.white10 : Colors.white.withValues(alpha: 0.96),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.14)),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              title,
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: AppFontWeights.emphasis,
-                color: cs.onSurface,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              body,
-              style: TextStyle(
-                fontSize: 13,
-                height: 1.38,
-                color: cs.onSurface.withValues(alpha: 0.68),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return Scaffold(
-      appBar: AppBar(
-        leading: Tooltip(
-          message: AppLocalizations.of(context)!.mcpPageBackTooltip,
-          child: _TactileIconButton(
-            icon: Lucide.ArrowLeft,
-            color: cs.onSurface,
-            size: 22,
-            onTap: () => Navigator.of(context).maybePop(),
-          ),
-        ),
-        title: const Text('文件权限引导'),
-      ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-        children: [
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: isGranted
-                  ? Colors.green.withValues(alpha: 0.12)
-                  : cs.primary.withValues(alpha: 0.10),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: (isGranted ? Colors.green : cs.primary).withValues(
-                  alpha: 0.28,
-                ),
-              ),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  isGranted ? Lucide.CheckCircle : Lucide.Folder,
-                  color: isGranted ? Colors.green : cs.primary,
-                  size: 22,
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    isGranted
-                        ? '已获得所有文件访问权限，@kelivo/files 可以访问 /storage/emulated/0 下的大多数可见文件。'
-                        : 'Android 11+ 需要授予“所有文件访问权限”，@kelivo/files 才能稳定访问手机可见目录。',
-                    style: TextStyle(
-                      fontSize: 13,
-                      height: 1.35,
-                      color: cs.onSurface.withValues(alpha: 0.78),
-                      fontWeight: AppFontWeights.medium,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 14),
-          step(
-            '默认工作区',
-            '默认保持 phone_storage，也就是 /storage/emulated/0。除非你明确要求切换，否则文件工具不会改到其它工作区。',
-          ),
-          step('授权方式', '点击下方按钮后，在系统页面里找到 Kelivo，打开“允许管理所有文件”。不同系统文案可能略有差异。'),
-          step('能力边界', '这是共享存储权限，不是 root 权限。系统保护目录、其它 App 私有目录仍然不能随便访问。'),
-          const SizedBox(height: 6),
-          FilledButton.icon(
-            onPressed: _requestPermission,
-            icon: Icon(isGranted ? Lucide.RefreshCw : Lucide.Settings),
-            label: Text(isGranted ? '重新检查权限' : '打开权限设置'),
-          ),
-          const SizedBox(height: 10),
-          OutlinedButton.icon(
-            onPressed: _refreshStatus,
-            icon: const Icon(Lucide.RotateCw),
-            label: const Text('刷新状态'),
-          ),
-        ],
-      ),
-    );
   }
 }
 

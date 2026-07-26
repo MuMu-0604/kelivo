@@ -240,6 +240,19 @@ class McpServerConfig {
       'workingDirectory': workingDirectory,
   };
 
+  static bool enabledFromJson(Map<String, dynamic> json) {
+    if (json.containsKey('disabled')) {
+      return json['disabled'] != true;
+    }
+    if (json.containsKey('enabled')) {
+      return json['enabled'] as bool? ?? true;
+    }
+    if (json.containsKey('isActive')) {
+      return json['isActive'] as bool? ?? true;
+    }
+    return true;
+  }
+
   factory McpServerConfig.fromJson(Map<String, dynamic> json) {
     final tRaw = (json['transport'] as String?) ?? '';
     final t = tRaw == 'http'
@@ -261,7 +274,7 @@ class McpServerConfig {
       final envAny = json['env'];
       return McpServerConfig(
         id: json['id'] as String? ?? const Uuid().v4(),
-        enabled: json['enabled'] as bool? ?? true,
+        enabled: enabledFromJson(json),
         name: json['name'] as String? ?? '',
         transport: McpTransportType.stdio,
         tools: tools,
@@ -277,7 +290,7 @@ class McpServerConfig {
     } else if (t == McpTransportType.inmemory) {
       return McpServerConfig(
         id: json['id'] as String? ?? const Uuid().v4(),
-        enabled: json['enabled'] as bool? ?? true,
+        enabled: enabledFromJson(json),
         name: json['name'] as String? ?? '',
         transport: McpTransportType.inmemory,
         tools: tools,
@@ -285,7 +298,7 @@ class McpServerConfig {
     } else {
       return McpServerConfig(
         id: json['id'] as String? ?? const Uuid().v4(),
-        enabled: json['enabled'] as bool? ?? true,
+        enabled: enabledFromJson(json),
         name: json['name'] as String? ?? '',
         transport: t,
         url: json['url'] as String? ?? '',
@@ -304,6 +317,8 @@ class McpProvider extends ChangeNotifier {
   static const String _prefsKey = 'mcp_servers_v1';
   static const String _prefsTimeoutKey = 'mcp_request_timeout_ms_v1';
   static const String _githubTokenPrefsKey = 'mcp_github_token_v1';
+  static const String _imagesApiBaseUrlPrefsKey = 'mcp_images_api_base_url_v1';
+  static const String _imagesApiKeyPrefsKey = 'mcp_images_api_key_v1';
   static const String _builtinFetchId = 'kelivo_fetch';
   static const String _builtinFetchName = '@kelivo/fetch';
   static const String _builtinFilesId = 'kelivo_files';
@@ -372,6 +387,8 @@ class McpProvider extends ChangeNotifier {
   final List<McpCallLogEntry> _callLogs = <McpCallLogEntry>[];
   Duration _requestTimeout = const Duration(seconds: 30);
   String _githubToken = '';
+  String _imagesApiBaseUrl = KelivoImagesMcpServerEngine.defaultApiBaseUrl;
+  String _imagesApiKey = '';
   bool _disposed = false;
   final McpStdioCommandResolver _stdioCommandResolver =
       McpStdioCommandResolver();
@@ -395,6 +412,11 @@ class McpProvider extends ChangeNotifier {
   bool get hasCallLogs => _callLogs.isNotEmpty;
   String get githubToken => _githubToken;
   bool get hasGithubToken => _githubToken.trim().isNotEmpty;
+  String get imagesApiBaseUrl => _imagesApiBaseUrl;
+  String get imagesApiKey => _imagesApiKey;
+  bool get hasImagesApiKey => _imagesApiKey.trim().isNotEmpty;
+  bool get hasImagesConfig =>
+      _imagesApiBaseUrl.trim().isNotEmpty && _imagesApiKey.trim().isNotEmpty;
 
   @override
   void notifyListeners() {
@@ -409,6 +431,11 @@ class McpProvider extends ChangeNotifier {
       _requestTimeout = Duration(milliseconds: timeoutMs);
     }
     _githubToken = prefs.getString(_githubTokenPrefsKey)?.trim() ?? '';
+    _imagesApiBaseUrl =
+        prefs.getString(_imagesApiBaseUrlPrefsKey)?.trim().isNotEmpty == true
+        ? prefs.getString(_imagesApiBaseUrlPrefsKey)!.trim()
+        : KelivoImagesMcpServerEngine.defaultApiBaseUrl;
+    _imagesApiKey = prefs.getString(_imagesApiKeyPrefsKey)?.trim() ?? '';
     final raw = prefs.getString(_prefsKey);
     if (raw != null && raw.isNotEmpty) {
       try {
@@ -461,10 +488,7 @@ class McpProvider extends ChangeNotifier {
   }
 
   Iterable<McpServerConfig> _autoConnectServers() {
-    return _servers.where(
-      (s) =>
-          s.enabled && !_isBuiltinFilesServer(s) && !_isBuiltinImagesServer(s),
-    );
+    return _servers.where((s) => s.enabled && !_isBuiltinFilesServer(s));
   }
 
   bool _hasBuiltinServer(String id, String name) {
@@ -515,6 +539,14 @@ class McpProvider extends ChangeNotifier {
     return _isBuiltinGithubServer(server);
   }
 
+  bool isBuiltinFilesServer(McpServerConfig server) {
+    return _isBuiltinFilesServer(server);
+  }
+
+  bool isBuiltinImagesServer(McpServerConfig server) {
+    return _isBuiltinImagesServer(server);
+  }
+
   bool _isBuiltinFetchServer(McpServerConfig server) {
     return server.transport == McpTransportType.inmemory &&
         (server.id == _builtinFetchId || server.name == _builtinFetchName);
@@ -522,7 +554,12 @@ class McpProvider extends ChangeNotifier {
 
   KelivoInMemoryMcpServerEngine _createBuiltinEngine(McpServerConfig server) {
     if (_isBuiltinFilesServer(server)) return KelivoFilesMcpServerEngine();
-    if (_isBuiltinImagesServer(server)) return KelivoImagesMcpServerEngine();
+    if (_isBuiltinImagesServer(server)) {
+      return KelivoImagesMcpServerEngine(
+        apiBaseUrlProvider: () => _imagesApiBaseUrl,
+        apiKeyProvider: () => _imagesApiKey,
+      );
+    }
     if (_isBuiltinGithubServer(server)) {
       return KelivoGithubMcpServerEngine(
         client: GitHubApiClient(accessTokenProvider: () async => _githubToken),
@@ -558,6 +595,35 @@ class McpProvider extends ChangeNotifier {
     notifyListeners();
     for (final server in _servers) {
       if (_isBuiltinGithubServer(server) && server.enabled) {
+        unawaited(reconnect(server.id));
+        break;
+      }
+    }
+  }
+
+  Future<void> updateImagesConfig({
+    required String apiBaseUrl,
+    required String apiKey,
+  }) async {
+    final normalizedUrl = apiBaseUrl.trim().isEmpty
+        ? KelivoImagesMcpServerEngine.defaultApiBaseUrl
+        : apiBaseUrl.trim();
+    final normalizedKey = apiKey.trim();
+    if (normalizedUrl == _imagesApiBaseUrl && normalizedKey == _imagesApiKey) {
+      return;
+    }
+    _imagesApiBaseUrl = normalizedUrl;
+    _imagesApiKey = normalizedKey;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_imagesApiBaseUrlPrefsKey, normalizedUrl);
+    if (normalizedKey.isEmpty) {
+      await prefs.remove(_imagesApiKeyPrefsKey);
+    } else {
+      await prefs.setString(_imagesApiKeyPrefsKey, normalizedKey);
+    }
+    notifyListeners();
+    for (final server in _servers) {
+      if (_isBuiltinImagesServer(server) && server.enabled) {
         unawaited(reconnect(server.id));
         break;
       }
@@ -662,7 +728,7 @@ class McpProvider extends ChangeNotifier {
           final cfg = cfgAny.cast<String, dynamic>();
           final typeLower = (cfg['type'] ?? '').toString().toLowerCase();
           if (typeLower == 'inmemory') {
-            final enabled = (cfg['isActive'] as bool?) ?? true;
+            final enabled = McpServerConfig.enabledFromJson(cfg);
             final name = (cfg['name'] as String?)?.trim();
             if (id == _builtinFilesId || name == _builtinFilesName) {
               builtinEnabledById[_builtinFilesId] = enabled;
@@ -688,7 +754,7 @@ class McpProvider extends ChangeNotifier {
               // Mobile: skip stdio entries entirely
               return;
             }
-            final enabled = (cfg['isActive'] as bool?) ?? true;
+            final enabled = McpServerConfig.enabledFromJson(cfg);
             final name = (cfg['name'] as String?)?.trim();
             final cmd = (cfg['command'] as String?)?.trim();
             if (cmd == null || cmd.isEmpty) {
@@ -730,7 +796,7 @@ class McpProvider extends ChangeNotifier {
           final transport = (typeRaw.contains('http'))
               ? McpTransportType.http
               : McpTransportType.sse;
-          final enabled = (cfg['isActive'] as bool?) ?? true;
+          final enabled = McpServerConfig.enabledFromJson(cfg);
           final name = (cfg['name'] as String?)?.trim();
           final url = (cfg['baseUrl'] as String?)?.trim();
           final headersAny = cfg['headers'];
@@ -841,6 +907,14 @@ class McpProvider extends ChangeNotifier {
       throw FormatException('No valid MCP servers found in JSON');
     }
 
+    await replaceAllFromConfigs(next);
+  }
+
+  Future<void> replaceAllFromConfigs(List<McpServerConfig> nextServers) async {
+    if (nextServers.isEmpty) {
+      throw const FormatException('No valid MCP servers found in JSON');
+    }
+
     // Disconnect all current
     for (final s in _servers) {
       try {
@@ -849,7 +923,7 @@ class McpProvider extends ChangeNotifier {
     }
 
     // Replace and reset statuses
-    _servers = next;
+    _servers = List<McpServerConfig>.of(nextServers);
     _status.clear();
     _errors.clear();
     for (final s in _servers) {
@@ -904,6 +978,29 @@ class McpProvider extends ChangeNotifier {
     await _persist();
     notifyListeners();
     if (enabled) {
+      unawaited(connect(id));
+    }
+    return id;
+  }
+
+  Future<String> addServerConfig(McpServerConfig config) async {
+    final id = config.id.trim().isEmpty ? const Uuid().v4() : config.id.trim();
+    final cfg = config.copyWith(
+      id: id,
+      name: config.name.trim().isEmpty ? 'MCP' : config.name.trim(),
+      url: config.url.trim(),
+      command: config.command?.trim(),
+      workingDirectory: (config.workingDirectory?.trim().isNotEmpty ?? false)
+          ? config.workingDirectory!.trim()
+          : null,
+      clearWorkingDirectory:
+          !(config.workingDirectory?.trim().isNotEmpty ?? false),
+    );
+    _servers = [..._servers, cfg];
+    _status[id] = McpStatus.idle;
+    await _persist();
+    notifyListeners();
+    if (cfg.enabled) {
       unawaited(connect(id));
     }
     return id;

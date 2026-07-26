@@ -191,7 +191,7 @@ class ToolHandlerService {
 
     // 神经权能网关 tools
     if (assistant?.appControlEnabled == true && supportsTools) {
-      toolDefs.add(AppControlService.getToolDefinition());
+      toolDefs.add(AppControlService.getToolDefinition(assistant));
     }
 
     // Local tools
@@ -384,9 +384,26 @@ class ToolHandlerService {
             );
           }
           final action = (args['action'] ?? '').toString();
+          final target = (args['target'] ?? '').toString();
+          final operation = (args['operation'] ?? '').toString();
+          if ((action == AppControlActionNames.executeAction ||
+                  action == AppControlActionNames.inspectTarget ||
+                  action == AppControlActionNames.planAction) &&
+              target.isNotEmpty &&
+              !assistant!.appControlPolicy.isTargetEnabled(target)) {
+            return _toolError(
+              error: 'permission_denied',
+              message: 'Current assistant has disabled 神经权能网关 target: $target',
+              tool: name,
+            );
+          }
           final needsApproval =
-              action == AppControlActionNames.executeAction ||
-              action == AppControlActionNames.undoLast;
+              action == AppControlActionNames.undoLast ||
+              (action == AppControlActionNames.executeAction &&
+                  assistant!.appControlPolicy.approvalRequiredFor(
+                    target,
+                    operation,
+                  ));
           if (needsApproval && approvalService != null) {
             final approvalToolCallId = toolCallId?.trim().isNotEmpty == true
                 ? toolCallId!.trim()

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'app_control_policy.dart';
 import 'assistant_regex.dart';
 import 'preset_message.dart';
 
@@ -38,6 +39,7 @@ class Assistant {
   final List<String> localToolIds; // enabled local tool IDs
   final List<String> skillIds; // enabled reusable skill IDs
   final bool appControlEnabled; // allow this assistant to control app config
+  final AppControlPolicy appControlPolicy; // target-level app control policy
   final String? background; // chat background (color/image ref)
   // Custom request overrides (per assistant)
   final List<Map<String, String>>
@@ -75,6 +77,7 @@ class Assistant {
     this.localToolIds = const <String>[],
     this.skillIds = const <String>[],
     this.appControlEnabled = false,
+    this.appControlPolicy = const AppControlPolicy(),
     this.background,
     this.customHeaders = const <Map<String, String>>[],
     this.customBody = const <Map<String, String>>[],
@@ -107,6 +110,7 @@ class Assistant {
     List<String>? localToolIds,
     List<String>? skillIds,
     bool? appControlEnabled,
+    AppControlPolicy? appControlPolicy,
     String? background,
     List<Map<String, String>>? customHeaders,
     List<Map<String, String>>? customBody,
@@ -149,6 +153,7 @@ class Assistant {
       localToolIds: localToolIds ?? this.localToolIds,
       skillIds: skillIds ?? this.skillIds,
       appControlEnabled: appControlEnabled ?? this.appControlEnabled,
+      appControlPolicy: appControlPolicy ?? this.appControlPolicy,
       background: clearBackground ? null : (background ?? this.background),
       customHeaders: customHeaders ?? this.customHeaders,
       customBody: customBody ?? this.customBody,
@@ -184,6 +189,9 @@ class Assistant {
     'localToolIds': localToolIds,
     'skillIds': skillIds,
     'appControlEnabled': appControlEnabled,
+    'appControlPolicy': appControlPolicy
+        .copyWith(enabled: appControlEnabled)
+        .toJson(),
     'background': background,
     'customHeaders': customHeaders,
     'customBody': customBody,
@@ -194,89 +202,98 @@ class Assistant {
     'regexRules': regexRules.map((e) => e.toJson()).toList(),
   };
 
-  static Assistant fromJson(Map<String, dynamic> json) => Assistant(
-    id: json['id'] as String,
-    name: (json['name'] as String?) ?? '',
-    avatar: json['avatar'] as String?,
-    useAssistantAvatar: json['useAssistantAvatar'] as bool? ?? false,
-    useAssistantName: json['useAssistantName'] as bool? ?? false,
-    chatModelProvider: json['chatModelProvider'] as String?,
-    chatModelId: json['chatModelId'] as String?,
-    temperature: (json['temperature'] as num?)?.toDouble(),
-    topP: (json['topP'] as num?)?.toDouble(),
-    contextMessageSize: (json['contextMessageSize'] as num?)?.toInt() ?? 64,
-    limitContextMessages: json['limitContextMessages'] as bool? ?? true,
-    streamOutput: json['streamOutput'] as bool? ?? true,
-    thinkingBudget: (json['thinkingBudget'] as num?)?.toInt(),
-    maxTokens: (json['maxTokens'] as num?)?.toInt(),
-    systemPrompt: (json['systemPrompt'] as String?) ?? '',
-    messageTemplate: (json['messageTemplate'] as String?) ?? '{{ message }}',
-    searchEnabled: json['searchEnabled'] as bool? ?? false,
-    mcpServerIds:
-        (json['mcpServerIds'] as List?)?.cast<String>() ?? const <String>[],
-    localToolIds:
-        (json['localToolIds'] as List?)?.cast<String>() ?? const <String>[],
-    skillIds: (json['skillIds'] as List?)?.cast<String>() ?? const <String>[],
-    appControlEnabled: json['appControlEnabled'] as bool? ?? false,
-    background: json['background'] as String?,
-    customHeaders: (() {
-      final raw = json['customHeaders'];
-      if (raw is List) {
-        return raw
-            .whereType<Map>()
-            .map(
-              (e) => {
-                'name': (e['name'] ?? e['key'] ?? '').toString(),
-                'value': (e['value'] ?? '').toString(),
-              },
-            )
-            .toList();
-      }
-      return const <Map<String, String>>[];
-    })(),
-    customBody: (() {
-      final raw = json['customBody'];
-      if (raw is List) {
-        return raw
-            .whereType<Map>()
-            .map(
-              (e) => {
-                'key': (e['key'] ?? e['name'] ?? '').toString(),
-                'value': (e['value'] ?? '').toString(),
-              },
-            )
-            .toList();
-      }
-      return const <Map<String, String>>[];
-    })(),
-    enableMemory: json['enableMemory'] as bool? ?? false,
-    enableRecentChatsReference:
-        json['enableRecentChatsReference'] as bool? ?? false,
-    recentChatsSummaryMessageCount: (() {
-      final raw = (json['recentChatsSummaryMessageCount'] as num?)?.toInt();
-      if (raw == null || raw < 1) {
-        return defaultRecentChatsSummaryMessageCount;
-      }
-      return raw;
-    })(),
-    presetMessages: (() {
-      try {
-        return PresetMessage.decodeList(json['presetMessages']);
-      } catch (_) {
-        return const <PresetMessage>[];
-      }
-    })(),
-    regexRules: (() {
-      final raw = json['regexRules'];
-      if (raw is List) {
-        return raw
-            .whereType<Map>()
-            .map((e) => AssistantRegex.fromJson(e.cast<String, dynamic>()))
-            .toList();
-      }
-      return const <AssistantRegex>[];
-    })(),
-  );
+  static Assistant fromJson(Map<String, dynamic> json) {
+    final legacyAppControlEnabled = json['appControlEnabled'] as bool? ?? false;
+    final policy = AppControlPolicy.fromJson(
+      json['appControlPolicy'] is Map
+          ? (json['appControlPolicy'] as Map).cast<String, dynamic>()
+          : null,
+    ).forRuntime(legacyEnabled: legacyAppControlEnabled);
+    return Assistant(
+      id: json['id'] as String,
+      name: (json['name'] as String?) ?? '',
+      avatar: json['avatar'] as String?,
+      useAssistantAvatar: json['useAssistantAvatar'] as bool? ?? false,
+      useAssistantName: json['useAssistantName'] as bool? ?? false,
+      chatModelProvider: json['chatModelProvider'] as String?,
+      chatModelId: json['chatModelId'] as String?,
+      temperature: (json['temperature'] as num?)?.toDouble(),
+      topP: (json['topP'] as num?)?.toDouble(),
+      contextMessageSize: (json['contextMessageSize'] as num?)?.toInt() ?? 64,
+      limitContextMessages: json['limitContextMessages'] as bool? ?? true,
+      streamOutput: json['streamOutput'] as bool? ?? true,
+      thinkingBudget: (json['thinkingBudget'] as num?)?.toInt(),
+      maxTokens: (json['maxTokens'] as num?)?.toInt(),
+      systemPrompt: (json['systemPrompt'] as String?) ?? '',
+      messageTemplate: (json['messageTemplate'] as String?) ?? '{{ message }}',
+      searchEnabled: json['searchEnabled'] as bool? ?? false,
+      mcpServerIds:
+          (json['mcpServerIds'] as List?)?.cast<String>() ?? const <String>[],
+      localToolIds:
+          (json['localToolIds'] as List?)?.cast<String>() ?? const <String>[],
+      skillIds: (json['skillIds'] as List?)?.cast<String>() ?? const <String>[],
+      appControlEnabled: legacyAppControlEnabled,
+      appControlPolicy: policy,
+      background: json['background'] as String?,
+      customHeaders: (() {
+        final raw = json['customHeaders'];
+        if (raw is List) {
+          return raw
+              .whereType<Map>()
+              .map(
+                (e) => {
+                  'name': (e['name'] ?? e['key'] ?? '').toString(),
+                  'value': (e['value'] ?? '').toString(),
+                },
+              )
+              .toList();
+        }
+        return const <Map<String, String>>[];
+      })(),
+      customBody: (() {
+        final raw = json['customBody'];
+        if (raw is List) {
+          return raw
+              .whereType<Map>()
+              .map(
+                (e) => {
+                  'key': (e['key'] ?? e['name'] ?? '').toString(),
+                  'value': (e['value'] ?? '').toString(),
+                },
+              )
+              .toList();
+        }
+        return const <Map<String, String>>[];
+      })(),
+      enableMemory: json['enableMemory'] as bool? ?? false,
+      enableRecentChatsReference:
+          json['enableRecentChatsReference'] as bool? ?? false,
+      recentChatsSummaryMessageCount: (() {
+        final raw = (json['recentChatsSummaryMessageCount'] as num?)?.toInt();
+        if (raw == null || raw < 1) {
+          return defaultRecentChatsSummaryMessageCount;
+        }
+        return raw;
+      })(),
+      presetMessages: (() {
+        try {
+          return PresetMessage.decodeList(json['presetMessages']);
+        } catch (_) {
+          return const <PresetMessage>[];
+        }
+      })(),
+      regexRules: (() {
+        final raw = json['regexRules'];
+        if (raw is List) {
+          return raw
+              .whereType<Map>()
+              .map((e) => AssistantRegex.fromJson(e.cast<String, dynamic>()))
+              .toList();
+        }
+        return const <AssistantRegex>[];
+      })(),
+    );
+  }
 
   static String encodeList(List<Assistant> list) =>
       jsonEncode(list.map((e) => e.toJson()).toList());

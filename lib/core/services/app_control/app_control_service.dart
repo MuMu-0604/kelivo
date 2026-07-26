@@ -153,6 +153,35 @@ Supported targets:
 Prefer `plan_action` when the user's wording is ambiguous or the change is large. Use `execute_action` only when the user clearly asks to apply/import/save the content. Include concise `title` and `reason` fields so Kelivo can show a useful confirmation. Use `undo_last` when the user asks to undo the last 神经权能网关 operation.
 ''';
 
+  static String systemPromptForAssistant(Assistant assistant) {
+    final enabled = capabilitiesForAssistant(assistant);
+    final buffer = StringBuffer()
+      ..writeln('Kelivo 神经权能网关 is available for this assistant.')
+      ..writeln(
+        'Use the `kelivo_app_control` tool only for targets enabled by this assistant policy.',
+      )
+      ..writeln()
+      ..writeln('Enabled targets:');
+    for (final item in enabled) {
+      final target = item['target'].toString();
+      final operations = (item['operations'] as List).join(', ');
+      final approval = assistant.appControlPolicy.approvalRequiredFor(
+        target,
+        '',
+      );
+      buffer.writeln(
+        '- `$target`: operations [$operations]; approval ${approval ? 'usually required' : 'not usually required'}.',
+      );
+    }
+    buffer
+      ..writeln('- `audit_log`: inspect recent gateway operations.')
+      ..writeln()
+      ..writeln(
+        'Prefer `plan_action` for ambiguous or large changes. Use `execute_action` only when the user clearly asks to apply, import, save, or configure content. Use `undo_last` when the user asks to undo the last gateway operation.',
+      );
+    return buffer.toString();
+  }
+
   static const List<Map<String, dynamic>> capabilities = [
     {
       'target': AppControlTargets.currentAssistantSettings,
@@ -325,174 +354,183 @@ Prefer `plan_action` when the user's wording is ambiguous or the change is large
   final BuildContext contextProvider;
   final Uuid _uuid = const Uuid();
 
-  static Map<String, dynamic> getToolDefinition() => const {
-    'type': 'function',
-    'function': {
-      'name': AppControlToolNames.appControl,
-      'description':
-          'Plan, inspect, execute, or undo safe Kelivo 神经权能网关 actions such as importing generated content into the current assistant prompt, memory, instruction injection, or world book. Execution requires the assistant 神经权能网关 permission and user confirmation.',
-      'parameters': {
-        'type': 'object',
-        'properties': {
-          'action': {
-            'type': 'string',
-            'enum': [
-              AppControlActionNames.listCapabilities,
-              AppControlActionNames.inspectTarget,
-              AppControlActionNames.planAction,
-              AppControlActionNames.executeAction,
-              AppControlActionNames.undoLast,
-            ],
-            'description': 'App control command to run.',
+  static List<Map<String, dynamic>> capabilitiesForAssistant(
+    Assistant? assistant,
+  ) {
+    if (assistant == null) return capabilities;
+    return capabilities
+        .where(
+          (item) => assistant.appControlPolicy.isTargetEnabled(
+            item['target'].toString(),
+          ),
+        )
+        .toList(growable: false);
+  }
+
+  static Map<String, dynamic> getToolDefinition([Assistant? assistant]) {
+    final targetIds = capabilitiesForAssistant(
+      assistant,
+    ).map((item) => item['target'].toString()).toSet().toList();
+    if (!targetIds.contains(AppControlTargets.auditLog)) {
+      targetIds.add(AppControlTargets.auditLog);
+    }
+    return {
+      'type': 'function',
+      'function': {
+        'name': AppControlToolNames.appControl,
+        'description':
+            'Plan, inspect, execute, or undo safe Kelivo 神经权能网关 actions such as importing generated content into the current assistant prompt, memory, instruction injection, or world book. Execution requires the assistant 神经权能网关 permission and user confirmation.',
+        'parameters': {
+          'type': 'object',
+          'properties': {
+            'action': {
+              'type': 'string',
+              'enum': [
+                AppControlActionNames.listCapabilities,
+                AppControlActionNames.inspectTarget,
+                AppControlActionNames.planAction,
+                AppControlActionNames.executeAction,
+                AppControlActionNames.undoLast,
+              ],
+              'description': 'App control command to run.',
+            },
+            'target': {
+              'type': 'string',
+              'enum': targetIds,
+              'description': 'Kelivo app data target.',
+            },
+            'operation': {
+              'type': 'string',
+              'enum': [
+                AppControlOperations.append,
+                AppControlOperations.overwrite,
+                AppControlOperations.create,
+                AppControlOperations.update,
+                AppControlOperations.enable,
+                AppControlOperations.disable,
+                AppControlOperations.bind,
+                AppControlOperations.unbind,
+                AppControlOperations.delete,
+                AppControlOperations.reorder,
+                AppControlOperations.importJson,
+                AppControlOperations.exportJson,
+                AppControlOperations.addEntry,
+                AppControlOperations.updateEntry,
+                AppControlOperations.deleteEntry,
+                AppControlOperations.createVersion,
+                AppControlOperations.rollbackVersion,
+                AppControlOperations.setApproval,
+              ],
+              'description': 'Mutation operation for the target.',
+            },
+            'content': {
+              'type': 'string',
+              'description':
+                  'Content to import, create, append, overwrite, or JSON config for settings/MCP/search updates.',
+            },
+            'id': {
+              'type': 'string',
+              'description':
+                  'Primary id to update, delete, enable, disable, or inspect in the selected target.',
+            },
+            'entry_id': {
+              'type': 'string',
+              'description':
+                  'World book entry id for update_entry or delete_entry.',
+            },
+            'book_id': {
+              'type': 'string',
+              'description': 'World book id for entry-level operations.',
+            },
+            'title': {
+              'type': 'string',
+              'description':
+                  'Short title for created items or confirmation UI.',
+            },
+            'reason': {
+              'type': 'string',
+              'description': 'Brief reason shown to the user before execution.',
+            },
+            'activate': {
+              'type': 'boolean',
+              'description':
+                  'Whether to activate the created instruction injection or world book for the current assistant.',
+            },
+            'ids': {
+              'type': 'array',
+              'items': {'type': 'string'},
+              'description':
+                  'Existing ids to bind/unbind, such as skill ids, local tool ids, or MCP server ids.',
+            },
+            'items': {
+              'type': 'array',
+              'items': {'type': 'object'},
+              'description':
+                  'Batch payload for import_json, reorder, or multi-item create/update/delete operations.',
+            },
+            'server_id': {
+              'type': 'string',
+              'description': 'MCP server id for mcp_server actions.',
+            },
+            'tool_name': {
+              'type': 'string',
+              'description': 'MCP tool name for mcp_server tool actions.',
+            },
+            'needs_approval': {
+              'type': 'boolean',
+              'description':
+                  'Whether the MCP tool should require user approval when operation is set_approval.',
+            },
+            'scope': {
+              'type': 'string',
+              'enum': ['assistant', 'global', 'selected_service', 'service'],
+              'description':
+                  'Where applicable, choose assistant-specific or global scope.',
+            },
+            'index': {
+              'type': 'integer',
+              'description':
+                  'Optional service index for selecting or updating a search provider.',
+            },
+            'old_index': {
+              'type': 'integer',
+              'description': 'Old index for reorder operations.',
+            },
+            'new_index': {
+              'type': 'integer',
+              'description': 'New index for reorder operations.',
+            },
+            'keywords': {
+              'type': 'array',
+              'items': {'type': 'string'},
+              'description':
+                  'Trigger keywords for skills or world book entries.',
+            },
+            'enabled': {
+              'type': 'boolean',
+              'description':
+                  'Optional enabled flag for updated skills, books, entries, or servers.',
+            },
+            'mode': {
+              'type': 'string',
+              'enum': ['merge', 'replace'],
+              'description':
+                  'Import mode. merge keeps existing data; replace swaps the target snapshot.',
+            },
+            'version_id': {
+              'type': 'string',
+              'description': 'Skill version id used for rollback_version.',
+            },
+            'priority': {
+              'type': 'integer',
+              'description': 'Optional priority for created skills.',
+            },
           },
-          'target': {
-            'type': 'string',
-            'enum': [
-              AppControlTargets.currentAssistantSettings,
-              AppControlTargets.currentAssistantSystemPrompt,
-              AppControlTargets.currentAssistantMemory,
-              AppControlTargets.currentAssistantSkills,
-              AppControlTargets.currentAssistantLocalTools,
-              AppControlTargets.currentAssistantMcp,
-              AppControlTargets.quickPhrase,
-              AppControlTargets.instructionInjection,
-              AppControlTargets.worldBook,
-              AppControlTargets.mcpServer,
-              AppControlTargets.searchSettings,
-              AppControlTargets.appBundle,
-              AppControlTargets.auditLog,
-            ],
-            'description': 'Kelivo app data target.',
-          },
-          'operation': {
-            'type': 'string',
-            'enum': [
-              AppControlOperations.append,
-              AppControlOperations.overwrite,
-              AppControlOperations.create,
-              AppControlOperations.update,
-              AppControlOperations.enable,
-              AppControlOperations.disable,
-              AppControlOperations.bind,
-              AppControlOperations.unbind,
-              AppControlOperations.delete,
-              AppControlOperations.reorder,
-              AppControlOperations.importJson,
-              AppControlOperations.exportJson,
-              AppControlOperations.addEntry,
-              AppControlOperations.updateEntry,
-              AppControlOperations.deleteEntry,
-              AppControlOperations.createVersion,
-              AppControlOperations.rollbackVersion,
-              AppControlOperations.setApproval,
-            ],
-            'description': 'Mutation operation for the target.',
-          },
-          'content': {
-            'type': 'string',
-            'description':
-                'Content to import, create, append, overwrite, or JSON config for settings/MCP/search updates.',
-          },
-          'id': {
-            'type': 'string',
-            'description':
-                'Primary id to update, delete, enable, disable, or inspect in the selected target.',
-          },
-          'entry_id': {
-            'type': 'string',
-            'description':
-                'World book entry id for update_entry or delete_entry.',
-          },
-          'book_id': {
-            'type': 'string',
-            'description': 'World book id for entry-level operations.',
-          },
-          'title': {
-            'type': 'string',
-            'description': 'Short title for created items or confirmation UI.',
-          },
-          'reason': {
-            'type': 'string',
-            'description': 'Brief reason shown to the user before execution.',
-          },
-          'activate': {
-            'type': 'boolean',
-            'description':
-                'Whether to activate the created instruction injection or world book for the current assistant.',
-          },
-          'ids': {
-            'type': 'array',
-            'items': {'type': 'string'},
-            'description':
-                'Existing ids to bind/unbind, such as skill ids, local tool ids, or MCP server ids.',
-          },
-          'items': {
-            'type': 'array',
-            'items': {'type': 'object'},
-            'description':
-                'Batch payload for import_json, reorder, or multi-item create/update/delete operations.',
-          },
-          'server_id': {
-            'type': 'string',
-            'description': 'MCP server id for mcp_server actions.',
-          },
-          'tool_name': {
-            'type': 'string',
-            'description': 'MCP tool name for mcp_server tool actions.',
-          },
-          'needs_approval': {
-            'type': 'boolean',
-            'description':
-                'Whether the MCP tool should require user approval when operation is set_approval.',
-          },
-          'scope': {
-            'type': 'string',
-            'enum': ['assistant', 'global', 'selected_service', 'service'],
-            'description':
-                'Where applicable, choose assistant-specific or global scope.',
-          },
-          'index': {
-            'type': 'integer',
-            'description':
-                'Optional service index for selecting or updating a search provider.',
-          },
-          'old_index': {
-            'type': 'integer',
-            'description': 'Old index for reorder operations.',
-          },
-          'new_index': {
-            'type': 'integer',
-            'description': 'New index for reorder operations.',
-          },
-          'keywords': {
-            'type': 'array',
-            'items': {'type': 'string'},
-            'description': 'Trigger keywords for skills or world book entries.',
-          },
-          'enabled': {
-            'type': 'boolean',
-            'description':
-                'Optional enabled flag for updated skills, books, entries, or servers.',
-          },
-          'mode': {
-            'type': 'string',
-            'enum': ['merge', 'replace'],
-            'description':
-                'Import mode. merge keeps existing data; replace swaps the target snapshot.',
-          },
-          'version_id': {
-            'type': 'string',
-            'description': 'Skill version id used for rollback_version.',
-          },
-          'priority': {
-            'type': 'integer',
-            'description': 'Optional priority for created skills.',
-          },
+          'required': ['action'],
         },
-        'required': ['action'],
       },
-    },
-  };
+    };
+  }
 
   Future<String> handleToolCall(
     Map<String, dynamic> args,
@@ -507,7 +545,8 @@ Prefer `plan_action` when the user's wording is ambiguous or the change is large
       case AppControlActionNames.listCapabilities:
         return _json({
           'type': 'app_control_capabilities',
-          'capabilities': capabilities,
+          'capabilities': capabilitiesForAssistant(assistant),
+          'policy': assistant?.appControlPolicy.toJson(),
           'permission_enabled': assistant?.appControlEnabled == true,
           'audit_count': _auditLog.length,
         });
@@ -530,6 +569,9 @@ Prefer `plan_action` when the user's wording is ambiguous or the change is large
     final target = args['target'].toString();
     final operation = args['operation'].toString();
     final content = args['content'].toString();
+    final requiresApproval =
+        assistant?.appControlPolicy.approvalRequiredFor(target, operation) ??
+        true;
     return _json({
       'type': 'app_control_plan',
       'target': target,
@@ -538,8 +580,9 @@ Prefer `plan_action` when the user's wording is ambiguous or the change is large
       'reason': _reason(args, target, operation),
       'content_preview': _preview(content),
       'content_length': content.length,
-      'requires_confirmation': true,
+      'requires_confirmation': requiresApproval,
       'permission_enabled': assistant?.appControlEnabled == true,
+      'target_enabled': assistant?.appControlPolicy.isTargetEnabled(target),
       'next_step': assistant?.appControlEnabled == true
           ? 'Call execute_action with the same target, operation, content, title, and activate fields after the user confirms.'
           : 'Ask the user to enable 神经权能网关 permission in this assistant settings.',
@@ -563,8 +606,15 @@ Prefer `plan_action` when the user's wording is ambiguous or the change is large
     final operation = args['operation'].toString();
     final content = args['content'].toString();
 
+    if (!assistant!.appControlPolicy.isTargetEnabled(target)) {
+      return _jsonError(
+        'permission_denied',
+        '神经权能网关 target is disabled for this assistant: $target',
+      );
+    }
+
     if (operation == AppControlOperations.exportJson) {
-      return _exportTarget(target, assistant!, args);
+      return _exportTarget(target, assistant, args);
     }
     if (target == AppControlTargets.auditLog) {
       return _inspectAuditLog();
@@ -572,55 +622,50 @@ Prefer `plan_action` when the user's wording is ambiguous or the change is large
 
     final result = switch (target) {
       AppControlTargets.currentAssistantSettings =>
-        await _executeAssistantSettings(assistant!, operation, content),
+        await _executeAssistantSettings(assistant, operation, content),
       AppControlTargets.currentAssistantSystemPrompt =>
-        await _executeAssistantPrompt(assistant!, operation, content),
+        await _executeAssistantPrompt(assistant, operation, content),
       AppControlTargets.currentAssistantMemory => await _executeMemory(
-        assistant!,
+        assistant,
         args,
         operation,
         content,
       ),
       AppControlTargets.currentAssistantSkills => await _executeSkills(
-        assistant!,
+        assistant,
         args,
         operation,
         content,
       ),
       AppControlTargets.currentAssistantLocalTools =>
-        await _executeAssistantLocalTools(assistant!, args, operation),
+        await _executeAssistantLocalTools(assistant, args, operation),
       AppControlTargets.currentAssistantMcp => await _executeAssistantMcp(
-        assistant!,
+        assistant,
         args,
         operation,
       ),
       AppControlTargets.quickPhrase => await _executeQuickPhrase(
-        assistant!,
+        assistant,
         args,
         operation,
         content,
       ),
       AppControlTargets.instructionInjection =>
-        await _executeInstructionInjection(
-          assistant!,
-          args,
-          operation,
-          content,
-        ),
+        await _executeInstructionInjection(assistant, args, operation, content),
       AppControlTargets.worldBook => await _executeWorldBook(
-        assistant!,
+        assistant,
         args,
         operation,
         content,
       ),
       AppControlTargets.mcpServer => await _executeMcpServer(args, operation),
       AppControlTargets.searchSettings => await _executeSearchSettings(
-        assistant!,
+        assistant,
         args,
         operation,
       ),
       AppControlTargets.appBundle => await _executeAppBundle(
-        assistant!,
+        assistant,
         args,
         operation,
         content,
@@ -693,30 +738,55 @@ Prefer `plan_action` when the user's wording is ambiguous or the change is large
       case AppControlTargets.currentAssistantSkills:
         final provider = contextProvider.read<SkillProvider>();
         await provider.initialize();
+        final visibleItems = provider.skills
+            .take(30)
+            .map(
+              (skill) => {
+                'id': skill.id,
+                'name': skill.name,
+                'enabled': skill.enabled,
+                'active': assistant.skillIds.contains(skill.id),
+                'priority': skill.priority,
+                'trigger_keywords': skill.triggerKeywords,
+                'source_path': skill.sourcePath,
+                'description_preview': _preview(skill.description),
+                'content_preview': _preview(skill.content),
+              },
+            )
+            .toList(growable: true);
+        final visibleIds = provider.skills.map((skill) => skill.id).toSet();
+        final missingItems = assistant.skillIds
+            .where((id) => !visibleIds.contains(id))
+            .map(
+              (id) => {
+                'id': id,
+                'missing': true,
+                'active': true,
+                'reason': 'skill_not_found_or_not_accessible',
+              },
+            )
+            .toList(growable: false);
+        visibleItems.addAll(missingItems);
+        final requestedSkillId = (args['id'] ?? '').toString().trim();
+        final requestedSkill = requestedSkillId.isEmpty
+            ? null
+            : provider.getById(requestedSkillId);
         return _json({
           'type': 'app_control_inspection',
           'target': target,
           'active_ids': assistant.skillIds,
-          'items': provider.skills
-              .take(30)
-              .map(
-                (skill) => {
-                  'id': skill.id,
-                  'name': skill.name,
-                  'enabled': skill.enabled,
-                  'active': assistant.skillIds.contains(skill.id),
-                  'priority': skill.priority,
-                  'trigger_keywords': skill.triggerKeywords,
-                  'source_path': skill.sourcePath,
-                  'description_preview': _preview(skill.description),
-                  'content_preview': _preview(skill.content),
-                },
-              )
-              .toList(growable: false),
-          if ((args['id'] ?? '').toString().trim().isNotEmpty)
-            'item': provider
-                .getById((args['id'] ?? '').toString().trim())
-                ?.toJson(),
+          'items': visibleItems,
+          if (requestedSkillId.isNotEmpty)
+            'item':
+                requestedSkill?.toJson() ??
+                (assistant.skillIds.contains(requestedSkillId)
+                    ? {
+                        'id': requestedSkillId,
+                        'missing': true,
+                        'active': true,
+                        'reason': 'skill_not_found_or_not_accessible',
+                      }
+                    : null),
         });
       case AppControlTargets.currentAssistantLocalTools:
         return _json({
@@ -897,8 +967,13 @@ Prefer `plan_action` when the user's wording is ambiguous or the change is large
   ) async {
     if (operation == AppControlOperations.importJson) {
       final decoded = _jsonObjectContent(content);
-      content = (decoded['system_prompt'] ?? decoded['content'] ?? '')
-          .toString();
+      if (decoded.containsKey('system_prompt')) {
+        content = decoded['system_prompt']?.toString() ?? '';
+      } else if (decoded.containsKey('systemPrompt')) {
+        content = decoded['systemPrompt']?.toString() ?? '';
+      } else {
+        content = decoded['content']?.toString() ?? '';
+      }
       operation = AppControlOperations.overwrite;
     }
     if (operation != AppControlOperations.append &&
@@ -911,7 +986,7 @@ Prefer `plan_action` when the user's wording is ambiguous or the change is large
     final ap = contextProvider.read<AssistantProvider>();
     final before = assistant.systemPrompt;
     final next = operation == AppControlOperations.overwrite
-        ? content.trim()
+        ? content
         : _appendBlock(before, content);
     await ap.updateAssistant(assistant.copyWith(systemPrompt: next));
     _pushUndo(
@@ -950,9 +1025,15 @@ Prefer `plan_action` when the user's wording is ambiguous or the change is large
       final name = patch['name']?.toString().trim() ?? '';
       if (name.isNotEmpty) next = next.copyWith(name: name);
     }
-    if (patch.containsKey('system_prompt')) {
+    if (patch.containsKey('system_prompt') ||
+        patch.containsKey('systemPrompt')) {
       next = next.copyWith(
-        systemPrompt: patch['system_prompt']?.toString() ?? '',
+        systemPrompt:
+            (patch.containsKey('system_prompt')
+                    ? patch['system_prompt']
+                    : patch['systemPrompt'])
+                ?.toString() ??
+            '',
       );
     }
     if (patch.containsKey('message_template')) {
@@ -1760,31 +1841,44 @@ Prefer `plan_action` when the user's wording is ambiguous or the change is large
       }
       final before = provider.servers.map((server) => server.toJson()).toList();
       try {
-        if (operation == AppControlOperations.update ||
-            operation == AppControlOperations.importJson) {
-          await provider.replaceAllFromJson(content);
-        } else {
-          final created = _mcpServersFromContent(content);
-          if (created.isEmpty) {
+        final parsed = _mcpServersFromContent(content);
+        if (parsed.isEmpty) {
+          return _jsonError(
+            'invalid_mcp_config',
+            'Invalid MCP config. Expected JSON such as {"mcpServers":{"name":{"command":"...","args":[],"env":{},"disabled":true}}}, a flat server object, or an exported servers list.',
+          );
+        }
+        if (operation == AppControlOperations.importJson) {
+          await provider.replaceAllFromConfigs(parsed);
+        } else if (operation == AppControlOperations.update) {
+          final serverId = (args['server_id'] ?? args['id'] ?? '')
+              .toString()
+              .trim();
+          if (serverId.isEmpty) {
+            return _jsonError('invalid_server_id', 'server_id is required');
+          }
+          final existing = provider.getById(serverId);
+          if (existing == null) {
             return _jsonError(
-              'invalid_mcp_config',
-              'No valid MCP server config found in content.',
+              'server_not_found',
+              'MCP server not found: $serverId',
             );
           }
-          final existingIds = provider.servers.map((s) => s.id).toSet();
-          for (final server in created) {
-            final id = existingIds.contains(server.id) ? _uuid.v4() : server.id;
-            await provider.addServer(
-              enabled: server.enabled,
-              name: server.name,
-              transport: server.transport,
-              url: server.url,
-              headers: server.headers,
-              command: server.command,
-              args: server.args,
-              env: server.env,
-              workingDirectory: server.workingDirectory,
+          final next = parsed.length == 1
+              ? parsed.single.copyWith(id: existing.id)
+              : parsed.where((server) => server.id == serverId).firstOrNull;
+          if (next == null) {
+            return _jsonError(
+              'invalid_mcp_config',
+              'No MCP server config matched server_id: $serverId',
             );
+          }
+          await provider.updateServer(next);
+        } else {
+          final existingIds = provider.servers.map((s) => s.id).toSet();
+          for (final server in parsed) {
+            final id = existingIds.contains(server.id) ? _uuid.v4() : server.id;
+            await provider.addServerConfig(server.copyWith(id: id));
             existingIds.add(id);
           }
         }
@@ -2463,6 +2557,10 @@ Prefer `plan_action` when the user's wording is ambiguous or the change is large
   }
 
   bool _contentRequired(String target, String operation) {
+    if (target == AppControlTargets.currentAssistantSystemPrompt &&
+        operation == AppControlOperations.overwrite) {
+      return false;
+    }
     if (operation == AppControlOperations.delete ||
         operation == AppControlOperations.reorder ||
         operation == AppControlOperations.exportJson ||
@@ -3099,65 +3197,101 @@ Prefer `plan_action` when the user's wording is ambiguous or the change is large
       );
     }
 
-    void addFromUiMap(Map<dynamic, dynamic> map) {
-      for (final entry in mapEntries(map)) {
-        final raw = entry.value;
-        if (raw is! Map) continue;
-        final cfg = raw.cast<String, dynamic>();
-        final id = entry.key.trim().isEmpty ? _uuid.v4() : entry.key.trim();
-        final type = (cfg['type'] ?? cfg['transport'] ?? '')
-            .toString()
-            .toLowerCase();
-        final enabled = cfg.containsKey('enabled')
-            ? _boolFrom(cfg['enabled'])
-            : (cfg.containsKey('isActive') ? _boolFrom(cfg['isActive']) : true);
-        final name = (cfg['name'] ?? id).toString().trim();
-        if (type == 'inmemory') {
-          configs.add(
-            McpServerConfig(
-              id: id,
-              enabled: enabled,
-              name: name.isEmpty ? id : name,
-              transport: McpTransportType.inmemory,
-            ),
-          );
-          continue;
-        }
-        if (type == 'stdio' || cfg.containsKey('command')) {
-          final command = (cfg['command'] ?? '').toString().trim();
-          if (command.isEmpty) continue;
-          configs.add(
-            McpServerConfig(
-              id: id,
-              enabled: enabled,
-              name: name.isEmpty ? id : name,
-              transport: McpTransportType.stdio,
-              command: command,
-              args: _stringListFromDynamic(cfg['args']),
-              env: _stringMapFromDynamic(cfg['env']),
-              workingDirectory:
-                  (cfg['workingDirectory'] ?? '').toString().trim().isEmpty
-                  ? null
-                  : (cfg['workingDirectory'] ?? '').toString().trim(),
-            ),
-          );
-          continue;
-        }
-        final transport = type.contains('http')
-            ? McpTransportType.http
-            : McpTransportType.sse;
-        final url = (cfg['url'] ?? cfg['baseUrl'] ?? '').toString().trim();
-        if (url.isEmpty) continue;
+    bool looksLikeSingleServer(Map<dynamic, dynamic> map) {
+      const configKeys = {
+        'id',
+        'name',
+        'type',
+        'transport',
+        'command',
+        'args',
+        'env',
+        'url',
+        'baseUrl',
+        'headers',
+        'enabled',
+        'disabled',
+        'isActive',
+        'workingDirectory',
+      };
+      return map.keys.any((key) => configKeys.contains(key.toString()));
+    }
+
+    bool enabledFromConfig(Map<String, dynamic> cfg) {
+      if (cfg.containsKey('disabled')) return !_boolFrom(cfg['disabled']);
+      if (cfg.containsKey('enabled')) return _boolFrom(cfg['enabled']);
+      if (cfg.containsKey('isActive')) return _boolFrom(cfg['isActive']);
+      return true;
+    }
+
+    void addOne(Map<dynamic, dynamic> rawMap, String fallbackId) {
+      final cfg = rawMap.cast<String, dynamic>();
+      final explicitId = (cfg['id'] ?? '').toString().trim();
+      final id = explicitId.isNotEmpty
+          ? explicitId
+          : (fallbackId.trim().isEmpty ? _uuid.v4() : fallbackId.trim());
+      final type = (cfg['type'] ?? cfg['transport'] ?? '')
+          .toString()
+          .toLowerCase();
+      final enabled = enabledFromConfig(cfg);
+      final name = (cfg['name'] ?? id).toString().trim();
+      if (type == 'inmemory') {
         configs.add(
           McpServerConfig(
             id: id,
             enabled: enabled,
             name: name.isEmpty ? id : name,
-            transport: transport,
-            url: url,
-            headers: _stringMapFromDynamic(cfg['headers']),
+            transport: McpTransportType.inmemory,
           ),
         );
+        return;
+      }
+      if (type == 'stdio' || cfg.containsKey('command')) {
+        final command = (cfg['command'] ?? '').toString().trim();
+        if (command.isEmpty) return;
+        configs.add(
+          McpServerConfig(
+            id: id,
+            enabled: enabled,
+            name: name.isEmpty ? id : name,
+            transport: McpTransportType.stdio,
+            command: command,
+            args: _stringListFromDynamic(cfg['args']),
+            env: _stringMapFromDynamic(cfg['env']),
+            workingDirectory:
+                (cfg['workingDirectory'] ?? '').toString().trim().isEmpty
+                ? null
+                : (cfg['workingDirectory'] ?? '').toString().trim(),
+          ),
+        );
+        return;
+      }
+      final transport = type.contains('http')
+          ? McpTransportType.http
+          : McpTransportType.sse;
+      final url = (cfg['url'] ?? cfg['baseUrl'] ?? '').toString().trim();
+      if (url.isEmpty) return;
+      configs.add(
+        McpServerConfig(
+          id: id,
+          enabled: enabled,
+          name: name.isEmpty ? id : name,
+          transport: transport,
+          url: url,
+          headers: _stringMapFromDynamic(cfg['headers']),
+        ),
+      );
+    }
+
+    void addFromUiMap(Map<dynamic, dynamic> map) {
+      if (looksLikeSingleServer(map)) {
+        addOne(map, (map['id'] ?? map['name'] ?? '').toString());
+        return;
+      }
+      for (final entry in mapEntries(map)) {
+        final raw = entry.value;
+        if (raw is! Map) continue;
+        addOne(raw, entry.key);
       }
     }
 

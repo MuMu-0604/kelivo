@@ -35,7 +35,7 @@ void main() {
       root = await Directory.systemTemp.createTemp('kelivo_images_mcp_test_');
       previousPathProvider = PathProviderPlatform.instance;
       PathProviderPlatform.instance = _FakePathProviderPlatform(root.path);
-      engine = KelivoImagesMcpServerEngine();
+      engine = KelivoImagesMcpServerEngine(apiKeyProvider: () => 'test-secret');
     });
 
     tearDown(() async {
@@ -44,7 +44,7 @@ void main() {
       if (await root.exists()) await root.delete(recursive: true);
     });
 
-    test('advertises user-configurable image generation tool', () async {
+    test('advertises settings-backed image generation tool', () async {
       final response =
           await engine.handleMessage({
                 'jsonrpc': '2.0',
@@ -66,16 +66,23 @@ void main() {
       final schema = tool['inputSchema'] as Map;
       final props = schema['properties'] as Map;
 
-      expect(props.keys, containsAll(['api_key', 'api_base_url', 'api_url']));
-      expect(props['api_base_url']['default'], 'https://api.openai.com/v1');
-      expect(schema['required'], containsAll(['prompt', 'api_key']));
+      expect(props.keys, isNot(contains('api_key')));
+      expect(props.keys, isNot(contains('api_base_url')));
+      expect(props.keys, isNot(contains('api_url')));
+      expect(schema['required'], ['prompt']);
     });
 
-    test('scans image models from user-provided api_base_url', () async {
+    test('scans image models from configured api base url', () async {
       late Uri requestUri;
       late String? authorization;
       final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
       addTearDown(() async => server.close(force: true));
+      engine.close();
+      engine = KelivoImagesMcpServerEngine(
+        apiBaseUrlProvider: () =>
+            'http://${server.address.address}:${server.port}/v1',
+        apiKeyProvider: () => 'test-secret',
+      );
 
       server.listen((request) async {
         requestUri = request.uri;
@@ -95,10 +102,7 @@ void main() {
         await request.response.close();
       });
 
-      final result = await _call(engine, 'kelivo_list_image_models', {
-        'api_key': 'test-secret',
-        'api_base_url': 'http://${server.address.address}:${server.port}/v1',
-      });
+      final result = await _call(engine, 'kelivo_list_image_models', {});
 
       expect(result['isError'], isFalse);
       expect(requestUri.path, '/v1/models');
@@ -175,7 +179,6 @@ void main() {
 
       final result = await _call(engine, 'kelivo_generate_image', {
         'prompt': 'draw a clean app icon',
-        'api_key': 'test-secret',
         'api_url':
             'http://${server.address.address}:${server.port}/custom/images',
         'model': 'my-image-model',
@@ -202,10 +205,16 @@ void main() {
       expect(await File(path).readAsBytes(), const [1, 2, 3, 4]);
     });
 
-    test('builds endpoint from user-provided api_base_url and path', () async {
+    test('builds endpoint from configured api base url and path', () async {
       late Uri requestUri;
       final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
       addTearDown(() async => server.close(force: true));
+      engine.close();
+      engine = KelivoImagesMcpServerEngine(
+        apiBaseUrlProvider: () =>
+            'http://${server.address.address}:${server.port}/v1',
+        apiKeyProvider: () => 'test-secret',
+      );
 
       server.listen((request) async {
         requestUri = request.uri;
@@ -224,8 +233,6 @@ void main() {
 
       final result = await _call(engine, 'kelivo_generate_image', {
         'prompt': 'draw a landscape',
-        'api_key': 'test-secret',
-        'api_base_url': 'http://${server.address.address}:${server.port}/v1',
         'endpoint_path': 'images/generations',
       });
 
@@ -249,7 +256,6 @@ void main() {
 
       final result = await _call(engine, 'kelivo_generate_image', {
         'prompt': 'draw something',
-        'api_key': 'test-secret',
         'api_url': 'http://${server.address.address}:${server.port}/images',
         'save_path': '../escape.png',
       });
@@ -259,6 +265,36 @@ void main() {
       expect(hitServer, isFalse);
       expect(await File('${root.parent.path}/escape.png').exists(), isFalse);
     });
+
+    test(
+      'reports missing configured API key before making the request',
+      () async {
+        var hitServer = false;
+        final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        addTearDown(() async => server.close(force: true));
+        engine.close();
+        engine = KelivoImagesMcpServerEngine(
+          apiBaseUrlProvider: () =>
+              'http://${server.address.address}:${server.port}/v1',
+          apiKeyProvider: () => '',
+        );
+
+        server.listen((request) async {
+          hitServer = true;
+          await request.drain<void>();
+          request.response.statusCode = HttpStatus.ok;
+          await request.response.close();
+        });
+
+        final result = await _call(engine, 'kelivo_generate_image', {
+          'prompt': 'draw something',
+        });
+
+        expect(result['isError'], isTrue);
+        expect(_text(result), contains('@kelivo/images'));
+        expect(hitServer, isFalse);
+      },
+    );
   });
 }
 

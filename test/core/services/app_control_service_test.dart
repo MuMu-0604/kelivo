@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:Kelivo/core/models/assistant.dart';
+import 'package:Kelivo/core/models/app_control_policy.dart';
 import 'package:Kelivo/core/providers/assistant_provider.dart';
 import 'package:Kelivo/core/providers/instruction_injection_provider.dart';
 import 'package:Kelivo/core/providers/memory_provider.dart';
@@ -67,6 +68,85 @@ void main() {
     expect(ap.getById(assistant.id)!.systemPrompt, 'Base prompt');
   });
 
+  testWidgets('app control clears assistant prompt with empty overwrite', (
+    tester,
+  ) async {
+    const assistant = Assistant(
+      id: 'assistant-a',
+      name: 'Assistant',
+      systemPrompt: 'Temporary prompt',
+      appControlEnabled: true,
+    );
+
+    await _pumpScope(tester, assistant);
+    final context = tester.element(find.byType(SizedBox));
+    final service = AppControlService(contextProvider: context);
+    final ap = context.read<AssistantProvider>();
+
+    final result =
+        jsonDecode(
+              await service.handleToolCall({
+                'action': AppControlActionNames.executeAction,
+                'target': AppControlTargets.currentAssistantSystemPrompt,
+                'operation': AppControlOperations.overwrite,
+                'content': '',
+              }, assistant),
+            )
+            as Map<String, dynamic>;
+
+    expect(result['success'], isTrue);
+    expect(result['content_length'], 0);
+    expect(ap.getById(assistant.id)!.systemPrompt, isEmpty);
+  });
+
+  testWidgets('app control clears prompt via camelCase import and settings', (
+    tester,
+  ) async {
+    const assistant = Assistant(
+      id: 'assistant-a',
+      name: 'Assistant',
+      systemPrompt: 'Temporary prompt',
+      appControlEnabled: true,
+    );
+
+    await _pumpScope(tester, assistant);
+    final context = tester.element(find.byType(SizedBox));
+    final service = AppControlService(contextProvider: context);
+    final ap = context.read<AssistantProvider>();
+
+    final imported =
+        jsonDecode(
+              await service.handleToolCall({
+                'action': AppControlActionNames.executeAction,
+                'target': AppControlTargets.currentAssistantSystemPrompt,
+                'operation': AppControlOperations.importJson,
+                'content': jsonEncode({'systemPrompt': ''}),
+              }, assistant),
+            )
+            as Map<String, dynamic>;
+
+    expect(imported['success'], isTrue);
+    expect(ap.getById(assistant.id)!.systemPrompt, isEmpty);
+
+    await ap.updateAssistant(
+      assistant.copyWith(systemPrompt: 'Temporary prompt'),
+    );
+
+    final updated =
+        jsonDecode(
+              await service.handleToolCall({
+                'action': AppControlActionNames.executeAction,
+                'target': AppControlTargets.currentAssistantSettings,
+                'operation': AppControlOperations.update,
+                'content': jsonEncode({'systemPrompt': ''}),
+              }, ap.getById(assistant.id)),
+            )
+            as Map<String, dynamic>;
+
+    expect(updated['success'], isTrue);
+    expect(ap.getById(assistant.id)!.systemPrompt, isEmpty);
+  });
+
   testWidgets('神经权能网关 creates active instruction injection', (tester) async {
     const assistant = Assistant(
       id: 'assistant-a',
@@ -120,6 +200,59 @@ void main() {
 
     expect(result['type'], 'app_control_error');
     expect(result['error'], 'permission_required');
+  });
+
+  testWidgets('神经权能网关 refuses disabled target by assistant policy', (
+    tester,
+  ) async {
+    final assistant = Assistant(
+      id: 'assistant-a',
+      name: 'Assistant',
+      appControlEnabled: true,
+      appControlPolicy: AppControlPolicy.safeDefault(
+        enabled: true,
+      ).setTargetEnabled(AppControlPolicy.currentAssistantSystemPrompt, false),
+    );
+
+    await _pumpScope(tester, assistant);
+    final context = tester.element(find.byType(SizedBox));
+    final service = AppControlService(contextProvider: context);
+
+    final result =
+        jsonDecode(
+              await service.handleToolCall({
+                'action': AppControlActionNames.executeAction,
+                'target': AppControlTargets.currentAssistantSystemPrompt,
+                'operation': AppControlOperations.append,
+                'content': 'Blocked prompt',
+              }, assistant),
+            )
+            as Map<String, dynamic>;
+
+    expect(result['type'], 'app_control_error');
+    expect(result['error'], 'permission_denied');
+  });
+
+  testWidgets('神经权能网关 exposes only enabled policy targets', (tester) async {
+    final assistant = Assistant(
+      id: 'assistant-a',
+      name: 'Assistant',
+      appControlEnabled: true,
+      appControlPolicy: AppControlPolicy.safeDefault(
+        enabled: true,
+      ).setTargetEnabled(AppControlPolicy.currentAssistantSystemPrompt, false),
+    );
+
+    final tool = AppControlService.getToolDefinition(assistant);
+    final targets =
+        ((tool['function'] as Map)['parameters'] as Map)['properties'] as Map;
+    final targetEnum = (targets['target'] as Map)['enum'] as List;
+
+    expect(
+      targetEnum,
+      isNot(contains(AppControlTargets.currentAssistantSystemPrompt)),
+    );
+    expect(targetEnum, contains(AppControlTargets.auditLog));
   });
 
   testWidgets('神经权能网关 updates assistant settings from JSON and undoes', (
@@ -212,6 +345,38 @@ void main() {
 
     expect(sp.getById(skillId), isNull);
     expect(ap.getById(assistant.id)!.skillIds, isNot(contains(skillId)));
+  });
+
+  testWidgets('app control inspect reports missing active skill ids', (
+    tester,
+  ) async {
+    const assistant = Assistant(
+      id: 'assistant-a',
+      name: 'Assistant',
+      appControlEnabled: true,
+      skillIds: ['missing-skill-id'],
+    );
+
+    await _pumpScope(tester, assistant);
+    final context = tester.element(find.byType(SizedBox));
+    final service = AppControlService(contextProvider: context);
+
+    final result =
+        jsonDecode(
+              await service.handleToolCall({
+                'action': AppControlActionNames.inspectTarget,
+                'target': AppControlTargets.currentAssistantSkills,
+              }, assistant),
+            )
+            as Map<String, dynamic>;
+    final items = (result['items'] as List).cast<Map>();
+    final missing = items.singleWhere(
+      (item) => item['id'] == 'missing-skill-id',
+    );
+
+    expect(missing['missing'], isTrue);
+    expect(missing['active'], isTrue);
+    expect(missing['reason'], 'skill_not_found_or_not_accessible');
   });
 
   testWidgets('神经权能网关 binds local tools without content', (tester) async {
@@ -572,6 +737,136 @@ void main() {
     expect(settings.searchEnabled, isFalse);
     expect(ap.getById(assistant.id)!.searchEnabled, isFalse);
   });
+
+  testWidgets('app control creates disabled MCP server from flat JSON', (
+    tester,
+  ) async {
+    const assistant = Assistant(
+      id: 'assistant-a',
+      name: 'Assistant',
+      appControlEnabled: true,
+    );
+
+    await _pumpScope(tester, assistant);
+    final context = tester.element(find.byType(SizedBox));
+    final service = AppControlService(contextProvider: context);
+    final provider = context.read<McpProvider>();
+
+    final result =
+        jsonDecode(
+              await service.handleToolCall({
+                'action': AppControlActionNames.executeAction,
+                'target': AppControlTargets.mcpServer,
+                'operation': AppControlOperations.create,
+                'content': jsonEncode({
+                  'id': 'gateway-test-dummy-mcp',
+                  'name': 'Gateway Test Dummy MCP',
+                  'enabled': false,
+                  'transport': 'stdio',
+                  'command': 'echo',
+                  'args': ['gateway-test'],
+                  'env': {},
+                }),
+              }, assistant),
+            )
+            as Map<String, dynamic>;
+
+    expect(result['success'], isTrue);
+    final server = provider.getById('gateway-test-dummy-mcp')!;
+    expect(server.enabled, isFalse);
+    expect(provider.statusFor(server.id), McpStatus.idle);
+  });
+
+  testWidgets(
+    'app control respects disabled true in MCP create update import',
+    (tester) async {
+      const assistant = Assistant(
+        id: 'assistant-a',
+        name: 'Assistant',
+        appControlEnabled: true,
+      );
+
+      await _pumpScope(tester, assistant);
+      final context = tester.element(find.byType(SizedBox));
+      final service = AppControlService(contextProvider: context);
+      final provider = context.read<McpProvider>();
+
+      final create =
+          jsonDecode(
+                await service.handleToolCall({
+                  'action': AppControlActionNames.executeAction,
+                  'target': AppControlTargets.mcpServer,
+                  'operation': AppControlOperations.create,
+                  'content': jsonEncode({
+                    'mcpServers': {
+                      'gateway-test-dummy-mcp': {
+                        'command': 'echo',
+                        'args': ['gateway-test'],
+                        'env': {},
+                        'disabled': true,
+                      },
+                    },
+                  }),
+                }, assistant),
+              )
+              as Map<String, dynamic>;
+
+      expect(create['success'], isTrue);
+      expect(provider.getById('gateway-test-dummy-mcp')!.enabled, isFalse);
+    expect(provider.statusFor('gateway-test-dummy-mcp'), McpStatus.idle);
+
+      final update =
+          jsonDecode(
+                await service.handleToolCall({
+                  'action': AppControlActionNames.executeAction,
+                  'target': AppControlTargets.mcpServer,
+                  'operation': AppControlOperations.update,
+                  'server_id': 'gateway-test-dummy-mcp',
+                  'content': jsonEncode({
+                    'mcpServers': {
+                      'gateway-test-dummy-mcp': {
+                        'command': 'echo',
+                        'args': ['gateway-test-updated'],
+                        'env': {},
+                        'disabled': true,
+                      },
+                    },
+                  }),
+                }, assistant),
+              )
+              as Map<String, dynamic>;
+
+      expect(update['success'], isTrue);
+      final updated = provider.getById('gateway-test-dummy-mcp')!;
+      expect(updated.enabled, isFalse);
+      expect(updated.args, ['gateway-test-updated']);
+
+      final importResult =
+          jsonDecode(
+                await service.handleToolCall({
+                  'action': AppControlActionNames.executeAction,
+                  'target': AppControlTargets.mcpServer,
+                  'operation': AppControlOperations.importJson,
+                  'content': jsonEncode({
+                    'mcpServers': {
+                      'gateway-test-import-mcp': {
+                        'command': 'echo',
+                        'args': ['gateway-test-imported'],
+                        'env': {},
+                        'disabled': true,
+                      },
+                    },
+                  }),
+                }, assistant),
+              )
+              as Map<String, dynamic>;
+
+      expect(importResult['success'], isTrue);
+      final imported = provider.getById('gateway-test-import-mcp')!;
+      expect(imported.enabled, isFalse);
+      expect(imported.args, ['gateway-test-imported']);
+    },
+  );
 }
 
 Future<void> _pumpScope(WidgetTester tester, Assistant assistant) async {

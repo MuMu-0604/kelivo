@@ -11,12 +11,15 @@ import '../in_memory_mcp_server.dart';
 
 /// Built-in OpenAI-compatible image generation MCP server.
 ///
-/// The API URL and API key are intentionally tool parameters so users can
-/// switch providers or gateways without rebuilding the app.
+/// The API URL and API key are configured at the built-in MCP server level so
+/// assistants no longer need to ask for credentials in the conversation.
 class KelivoImagesMcpServerEngine implements KelivoInMemoryMcpServerEngine {
-  KelivoImagesMcpServerEngine({http.Client? httpClient})
-    : _httpClient = httpClient ?? http.Client(),
-      _ownsHttpClient = httpClient == null;
+  KelivoImagesMcpServerEngine({
+    http.Client? httpClient,
+    this.apiBaseUrlProvider,
+    this.apiKeyProvider,
+  }) : _httpClient = httpClient ?? http.Client(),
+       _ownsHttpClient = httpClient == null;
 
   static const defaultApiBaseUrl = 'https://api.openai.com/v1';
   static const defaultEndpointPath = '/images/generations';
@@ -26,7 +29,16 @@ class KelivoImagesMcpServerEngine implements KelivoInMemoryMcpServerEngine {
 
   final http.Client _httpClient;
   final bool _ownsHttpClient;
+  final String Function()? apiBaseUrlProvider;
+  final String Function()? apiKeyProvider;
   bool _closed = false;
+
+  String _configuredApiBaseUrl() {
+    final configured = apiBaseUrlProvider?.call().trim() ?? '';
+    return configured.isEmpty ? defaultApiBaseUrl : configured;
+  }
+
+  String _configuredApiKey() => apiKeyProvider?.call().trim() ?? '';
 
   @override
   Future<dynamic> handleMessage(dynamic message) async {
@@ -100,7 +112,11 @@ class KelivoImagesMcpServerEngine implements KelivoInMemoryMcpServerEngine {
     Map<String, dynamic> args,
   ) async {
     try {
-      final request = _KelivoImageGenerationRequest.parse(args);
+      final request = _KelivoImageGenerationRequest.parse(
+        args,
+        configuredApiBaseUrl: _configuredApiBaseUrl(),
+        configuredApiKey: _configuredApiKey(),
+      );
       final response = await _httpClient.post(
         request.apiUri,
         headers: request.headers,
@@ -158,7 +174,11 @@ class KelivoImagesMcpServerEngine implements KelivoInMemoryMcpServerEngine {
     Map<String, dynamic> args,
   ) async {
     try {
-      final request = _KelivoImageModelsRequest.parse(args);
+      final request = _KelivoImageModelsRequest.parse(
+        args,
+        configuredApiBaseUrl: _configuredApiBaseUrl(),
+        configuredApiKey: _configuredApiKey(),
+      );
       final response = await _httpClient.get(
         request.modelsUri,
         headers: request.headers,
@@ -413,28 +433,13 @@ class KelivoImagesMcpServerEngine implements KelivoInMemoryMcpServerEngine {
     {
       'name': 'kelivo_list_image_models',
       'description':
-          '根据用户提供的 API Key 和 API 地址扫描可用模型。用户需要选择图片模型时先调用此工具，返回候选模型后再询问用户使用哪个模型生成图片。',
+          '根据 @kelivo/images 基础设置中的 API URL 和 Key 扫描可用模型。用户需要选择图片模型时先调用此工具，返回候选模型后再询问用户使用哪个模型生成图片。',
       'inputSchema': {
         'type': 'object',
         'properties': {
-          'api_key': {
-            'type': 'string',
-            'description': '用户提供的 API Key。会作为 Bearer 认证发送，并在日志中脱敏。',
-          },
-          'api_base_url': {
-            'type': 'string',
-            'description':
-                '用户提供的 API 基础地址，例如 https://api.openai.com/v1 或兼容网关。默认使用 OpenAI v1。',
-            'default': defaultApiBaseUrl,
-          },
-          'models_url': {
-            'type': 'string',
-            'description':
-                '可选的完整模型列表端点 URL。提供后会覆盖 api_base_url 和 models_endpoint_path。',
-          },
           'models_endpoint_path': {
             'type': 'string',
-            'description': '追加到 api_base_url 后的模型列表端点路径。',
+            'description': '追加到已配置 API URL 后的模型列表端点路径。',
             'default': defaultModelsEndpointPath,
           },
           'filter': {
@@ -443,38 +448,23 @@ class KelivoImagesMcpServerEngine implements KelivoInMemoryMcpServerEngine {
           },
           'headers': {
             'type': 'object',
-            'description': '可选的附加 HTTP 头。Authorization 默认由 api_key 设置。',
+            'description': '可选的附加 HTTP 头。Authorization 默认由已配置 API Key 设置。',
           },
         },
-        'required': ['api_key'],
+        'required': [],
       },
     },
     {
       'name': 'kelivo_generate_image',
       'description':
-          '通过兼容 OpenAI 的 Images API 生成图片。如果用户在对话中提供 API 地址/路径和 Key，请传入 api_base_url/api_url 与 api_key；工具内部不硬编码这些信息。',
+          '通过兼容 OpenAI 的 Images API 生成图片。API URL 和 Key 来自 @kelivo/images 基础设置，不要在对话中向用户索要或传递。',
       'inputSchema': {
         'type': 'object',
         'properties': {
           'prompt': {'type': 'string', 'description': '发送给图片生成 API 的图片提示词。'},
-          'api_key': {
-            'type': 'string',
-            'description': '用户在对话或设置中为本次调用提供的 API Key。会作为 Bearer 认证发送，并在日志中脱敏。',
-          },
-          'api_base_url': {
-            'type': 'string',
-            'description':
-                '用户提供的 API 基础地址，例如 https://api.openai.com/v1 或兼容网关。默认使用 OpenAI v1。',
-            'default': defaultApiBaseUrl,
-          },
-          'api_url': {
-            'type': 'string',
-            'description':
-                '用户提供的可选完整端点 URL。提供后会覆盖 api_base_url 和 endpoint_path。',
-          },
           'endpoint_path': {
             'type': 'string',
-            'description': '追加到 api_base_url 后的端点路径。',
+            'description': '追加到已配置 API URL 后的端点路径。',
             'default': defaultEndpointPath,
           },
           'model': {
@@ -501,10 +491,10 @@ class KelivoImagesMcpServerEngine implements KelivoInMemoryMcpServerEngine {
           },
           'headers': {
             'type': 'object',
-            'description': '可选的附加 HTTP 头。Authorization 默认由 api_key 设置。',
+            'description': '可选的附加 HTTP 头。Authorization 默认由已配置 API Key 设置。',
           },
         },
-        'required': ['prompt', 'api_key'],
+        'required': ['prompt'],
       },
     },
   ];
@@ -533,15 +523,25 @@ class _KelivoImageGenerationRequest {
   final String outputMime;
   final String? savePath;
 
-  static _KelivoImageGenerationRequest parse(Map<String, dynamic> args) {
+  static _KelivoImageGenerationRequest parse(
+    Map<String, dynamic> args, {
+    required String configuredApiBaseUrl,
+    required String configuredApiKey,
+  }) {
     final prompt = _requiredString(args, 'prompt');
-    final apiKey = _requiredString(args, 'api_key');
+    final apiKey = _requiredString(
+      args,
+      'api_key',
+      fallback: configuredApiKey,
+      errorMessage:
+          '@kelivo/images 尚未配置 API Key，请在 MCP 设置中打开 @kelivo/images 的基础设置填写 URL 和 Key。',
+    );
     final model = _stringArg(
       args,
       'model',
       KelivoImagesMcpServerEngine.defaultModel,
     );
-    final apiUri = _apiUri(args);
+    final apiUri = _apiUri(args, configuredApiBaseUrl);
     final outputFormat = _stringArg(
       args,
       'output_format',
@@ -604,14 +604,16 @@ class _KelivoImageGenerationRequest {
     );
   }
 
-  static Uri _apiUri(Map<String, dynamic> args) {
+  static Uri _apiUri(Map<String, dynamic> args, String configuredApiBaseUrl) {
     final full = (args['api_url'] ?? '').toString().trim();
     if (full.isNotEmpty) return _httpUri(full, fieldName: 'api_url');
 
     var base = _stringArg(
       args,
       'api_base_url',
-      KelivoImagesMcpServerEngine.defaultApiBaseUrl,
+      configuredApiBaseUrl.trim().isEmpty
+          ? KelivoImagesMcpServerEngine.defaultApiBaseUrl
+          : configuredApiBaseUrl.trim(),
     );
     while (base.endsWith('/')) {
       base = base.substring(0, base.length - 1);
@@ -633,10 +635,17 @@ class _KelivoImageGenerationRequest {
     return uri;
   }
 
-  static String _requiredString(Map<String, dynamic> args, String key) {
+  static String _requiredString(
+    Map<String, dynamic> args,
+    String key, {
+    String? fallback,
+    String? errorMessage,
+  }) {
     final value = (args[key] ?? '').toString().trim();
-    if (value.isEmpty) throw ArgumentError('$key is required.');
-    return value;
+    if (value.isNotEmpty) return value;
+    final fallbackValue = fallback?.trim() ?? '';
+    if (fallbackValue.isNotEmpty) return fallbackValue;
+    throw ArgumentError(errorMessage ?? '$key is required.');
   }
 
   static String _stringArg(
@@ -671,12 +680,19 @@ class _KelivoImageModelsRequest {
   final Map<String, String> headers;
   final String filter;
 
-  static _KelivoImageModelsRequest parse(Map<String, dynamic> args) {
+  static _KelivoImageModelsRequest parse(
+    Map<String, dynamic> args, {
+    required String configuredApiBaseUrl,
+    required String configuredApiKey,
+  }) {
     final apiKey = _KelivoImageGenerationRequest._requiredString(
       args,
       'api_key',
+      fallback: configuredApiKey,
+      errorMessage:
+          '@kelivo/images 尚未配置 API Key，请在 MCP 设置中打开 @kelivo/images 的基础设置填写 URL 和 Key。',
     );
-    final modelsUri = _modelsUri(args);
+    final modelsUri = _modelsUri(args, configuredApiBaseUrl);
     final headers = <String, String>{
       HttpHeaders.acceptHeader: ContentType.json.mimeType,
       HttpHeaders.authorizationHeader: 'Bearer $apiKey',
@@ -696,7 +712,10 @@ class _KelivoImageModelsRequest {
     );
   }
 
-  static Uri _modelsUri(Map<String, dynamic> args) {
+  static Uri _modelsUri(
+    Map<String, dynamic> args,
+    String configuredApiBaseUrl,
+  ) {
     final full = (args['models_url'] ?? '').toString().trim();
     if (full.isNotEmpty) {
       return _KelivoImageGenerationRequest._httpUri(
@@ -708,7 +727,9 @@ class _KelivoImageModelsRequest {
     var base = _KelivoImageGenerationRequest._stringArg(
       args,
       'api_base_url',
-      KelivoImagesMcpServerEngine.defaultApiBaseUrl,
+      configuredApiBaseUrl.trim().isEmpty
+          ? KelivoImagesMcpServerEngine.defaultApiBaseUrl
+          : configuredApiBaseUrl.trim(),
     );
     while (base.endsWith('/')) {
       base = base.substring(0, base.length - 1);
