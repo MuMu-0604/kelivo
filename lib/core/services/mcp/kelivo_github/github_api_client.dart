@@ -578,11 +578,28 @@ class GitHubApiClient {
     String? subjectType,
     int? inReplyTo,
   }) async {
-    final requestBody = <String, dynamic>{
-      'body': _requiredQuery(body),
-      if (inReplyTo != null)
-        'in_reply_to': _positiveInt(inReplyTo, name: 'in_reply_to'),
-      if (inReplyTo == null) ...{
+    final normalizedBody = _requiredQuery(body);
+    final replyTo = inReplyTo == null
+        ? null
+        : _positiveInt(inReplyTo, name: 'in_reply_to');
+
+    final Map<String, dynamic> requestBody;
+    if (replyTo != null) {
+      requestBody = <String, dynamic>{
+        'body': normalizedBody,
+        'in_reply_to': replyTo,
+      };
+    } else {
+      final normalizedSubjectType = (subjectType ?? '').trim().isEmpty
+          ? null
+          : _requiredReviewSubjectType(subjectType!);
+      if (line == null && normalizedSubjectType != 'file') {
+        throw ArgumentError(
+          'line is required for inline comments unless subject_type is file',
+        );
+      }
+      requestBody = <String, dynamic>{
+        'body': normalizedBody,
         'commit_id': _requiredQuery(commitId ?? ''),
         'path': _requiredPath(path ?? ''),
         if (line != null) 'line': _positiveInt(line, name: 'line'),
@@ -591,14 +608,8 @@ class GitHubApiClient {
           'start_line': _positiveInt(startLine, name: 'start_line'),
         if ((startSide ?? '').trim().isNotEmpty)
           'start_side': _requiredReviewSide(startSide!),
-        if ((subjectType ?? '').trim().isNotEmpty)
-          'subject_type': _requiredReviewSubjectType(subjectType!),
-      },
-    };
-    if (inReplyTo == null && line == null && subjectType?.trim() != 'file') {
-      throw ArgumentError(
-        'line is required for inline comments unless subject_type is file',
-      );
+        if (normalizedSubjectType != null) 'subject_type': normalizedSubjectType,
+      };
     }
     final raw = await _postJson(
       '/repos/${_segment(owner)}/${_segment(repo)}/pulls/${_positiveInt(pullNumber, name: 'pull_number')}/comments',

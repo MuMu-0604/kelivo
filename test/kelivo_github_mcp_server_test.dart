@@ -428,6 +428,80 @@ void main() {
         expect(bodies.last, {'body': 'Reply note', 'in_reply_to': 99});
       },
     );
+
+    test(
+      'ignores non-positive in_reply_to when creating new inline comments through MCP',
+      () async {
+        final bodies = <Map<String, dynamic>>[];
+        final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        addTearDown(() async {
+          await server.close(force: true);
+        });
+
+        server.listen((request) async {
+          bodies.add(
+            jsonDecode(await utf8.decoder.bind(request).join())
+                as Map<String, dynamic>,
+          );
+          request.response.statusCode = HttpStatus.created;
+          request.response.headers.contentType = ContentType.json;
+          request.response.write(
+            jsonEncode({
+              'id': bodies.length,
+              'user': {'login': 'octo'},
+              'body': bodies.last['body'],
+              'path': bodies.last['path'],
+              'line': bodies.last['line'],
+              'side': bodies.last['side'],
+              'commit_id': bodies.last['commit_id'],
+              'html_url':
+                  'https://github.com/acme/app/pull/3#discussion_r${bodies.length}',
+              'created_at': '2026-07-26T00:00:00Z',
+              'updated_at': '2026-07-26T00:00:00Z',
+            }),
+          );
+          await request.response.close();
+        });
+
+        final engine = KelivoGithubMcpServerEngine(
+          client: GitHubApiClient(
+            baseUri: Uri.parse(
+              'http://${server.address.address}:${server.port}',
+            ),
+          ),
+        );
+        addTearDown(engine.close);
+
+        await engine.handleMessage({
+          'jsonrpc': '2.0',
+          'id': 1,
+          'method': 'tools/call',
+          'params': {
+            'name': 'github_pull_request_write',
+            'arguments': {
+              'action': 'create_review_comment',
+              'owner': 'acme',
+              'repo': 'app',
+              'pull_number': 3,
+              'body': 'Inline note',
+              'commit_id': 'commit-sha',
+              'path': 'lib/app.dart',
+              'line': 12,
+              'side': 'RIGHT',
+              'in_reply_to': 0,
+            },
+          },
+        });
+
+        expect(bodies.single, {
+          'body': 'Inline note',
+          'commit_id': 'commit-sha',
+          'path': 'lib/app.dart',
+          'line': 12,
+          'side': 'RIGHT',
+        });
+      },
+    );
   });
 
   group('KelivoGithubMcpServerEngine', () {

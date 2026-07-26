@@ -514,9 +514,7 @@ class KelivoGithubMcpServerEngine implements KelivoInMemoryMcpServerEngine {
                     : null,
                 startSide: _stringArg(args, 'start_side'),
                 subjectType: _stringArg(args, 'subject_type'),
-                inReplyTo: args.containsKey('in_reply_to')
-                    ? _intArg(args, 'in_reply_to')
-                    : null,
+                inReplyTo: _optionalPositiveIntArg(args, 'in_reply_to'),
               ),
             ),
           );
@@ -958,6 +956,18 @@ class KelivoGithubMcpServerEngine implements KelivoInMemoryMcpServerEngine {
     final parsed = int.tryParse(raw.toString());
     if (parsed != null) return parsed;
     throw ArgumentError('$name must be an integer');
+  }
+
+  static int? _optionalPositiveIntArg(
+    Map<String, dynamic> args,
+    String name,
+  ) {
+    if (!args.containsKey(name)) return null;
+    final raw = args[name];
+    if (raw == null) return null;
+    if (raw is String && raw.trim().isEmpty) return null;
+    final value = _intArg(args, name);
+    return value > 0 ? value : null;
   }
 
   static bool _boolArg(
