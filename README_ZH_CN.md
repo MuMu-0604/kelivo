@@ -76,7 +76,12 @@ GitHub 工具按使用场景分组封装，不再把每个 API 端点都暴露�
 
 ### 安装 APK
 
-从 GitHub Releases 下载最新版 Android APK。本公开 APK 的 Android 包名仍为 `com.psyche.kelivo`，与原版 Kelivo 相同，因此需要注意：
+下载地址：
+
+- 最新 Release 页面：[Kelivo Plus 1.1.17+4069](https://github.com/MuMu-0604/kelivo/releases/tag/v1.1.17-plus.4069)
+- Android arm64 APK 直链：[Kelivo_android_1.1.17+4069_github-tools-parameter-hardening_fixedsign_arm64-v8a.apk](https://github.com/MuMu-0604/kelivo/releases/download/v1.1.17-plus.4069/Kelivo_android_1.1.17%2B4069_github-tools-parameter-hardening_fixedsign_arm64-v8a.apk)
+
+本公开 APK 的 Android 包名仍为 `com.psyche.kelivo`，与原版 Kelivo 相同，因此需要注意：
 
 - 不能直接覆盖安装原版 Kelivo：原版和本二改版通常使用不同签名，Android 会拒绝安装。
 - 不能与原版 Kelivo 直接共存：同一台设备上同一个包名只能安装一个应用。
