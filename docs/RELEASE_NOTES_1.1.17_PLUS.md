@@ -9,7 +9,7 @@
 Release 资产包含最新版 Android 通用 APK：
 
 ```text
-Kelivo_android_1.1.17+4073_neural-authority-gateway_fixedsign_universal.apk
+Kelivo_android_1.1.17+4073_gateway-report-fixes_fixedsign_universal.apk
 ```
 
 SHA256：
