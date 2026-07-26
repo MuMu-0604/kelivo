@@ -27,6 +27,7 @@ import '../../../utils/avatar_cache.dart';
 import '../../../utils/assistant_regex.dart';
 import '../../../core/models/assistant.dart';
 import '../../../core/providers/tts_provider.dart';
+import '../../../core/services/app_control/app_control_service.dart';
 import '../../../shared/widgets/markdown_with_highlight.dart';
 import '../../../shared/widgets/snackbar.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -95,10 +96,56 @@ Uri? _tryNormalizeExternalUri(String raw) {
   return (cleanText.trim(), images);
 }
 
+dynamic _redactSensitiveToolValue(dynamic value) {
+  if (value is List) return value.map(_redactSensitiveToolValue).toList();
+  if (value is! Map) return value;
+  return value.map((key, entryValue) {
+    final keyText = key.toString().toLowerCase();
+    final sensitive =
+        keyText.contains('key') ||
+        keyText.contains('token') ||
+        keyText.contains('secret') ||
+        keyText.contains('password') ||
+        keyText.contains('authorization') ||
+        keyText.contains('cookie');
+    return MapEntry(
+      key.toString(),
+      sensitive ? '***' : _redactSensitiveToolValue(entryValue),
+    );
+  });
+}
+
+Map<String, dynamic> _redactSensitiveToolArguments(Map<String, dynamic> args) {
+  final redacted = _redactSensitiveToolValue(args);
+  return redacted is Map<String, dynamic> ? redacted : args;
+}
+
+String _prettyToolArguments(Map<String, dynamic> args) {
+  return const JsonEncoder.withIndent(
+    '  ',
+  ).convert(_redactSensitiveToolArguments(args));
+}
+
+String _toolArgumentsSummary(Map<String, dynamic> args) {
+  if (args.isEmpty) return '';
+  final redacted = _redactSensitiveToolArguments(args);
+  final entries = redacted.entries.take(2).map((entry) {
+    final value = entry.value?.toString() ?? '';
+    final truncated = value.length > 40
+        ? '${value.substring(0, 40)}...'
+        : value;
+    return '${entry.key}: $truncated';
+  });
+  final suffix = redacted.length > 2 ? ' ...' : '';
+  return entries.join(', ') + suffix;
+}
+
 IconData _toolIconFor(String name, [Map<String, dynamic> args = const {}]) {
   final localIcon = _localToolIconFor(name, args);
   if (localIcon != null) return localIcon;
   switch (name) {
+    case AppControlToolNames.appControl:
+      return Lucide.Shield;
     case 'create_memory':
       return Lucide.bookHeart;
     case 'edit_memory':
@@ -244,6 +291,8 @@ String _toolTitleFor(
   final localToolTitle = _localToolTitleFor(l10n, name, args);
   if (localToolTitle != null) return localToolTitle;
   switch (name) {
+    case AppControlToolNames.appControl:
+      return 'App Control Agent';
     case 'create_memory':
       return l10n.chatMessageWidgetCreateMemory;
     case 'edit_memory':
@@ -260,6 +309,59 @@ String _toolTitleFor(
           ? l10n.chatMessageWidgetToolResult(name)
           : l10n.chatMessageWidgetToolCall(name);
   }
+}
+
+ToolApprovalRequest? _pendingApprovalForToolPart(
+  ToolApprovalService approvalService,
+  ToolUIPart part,
+) {
+  if (part.id.isNotEmpty && approvalService.isPending(part.id)) {
+    return approvalService.pendingRequests[part.id];
+  }
+  for (final request in approvalService.pendingRequests.values) {
+    if (request.toolName == part.toolName) return request;
+  }
+  return null;
+}
+
+bool _toolPartNeedsStandaloneStep(
+  ToolApprovalService approvalService,
+  ToolUIPart part,
+) {
+  if (_pendingApprovalForToolPart(approvalService, part) != null) {
+    return true;
+  }
+  if (part.toolName == LocalToolNames.askUser) {
+    return part.loading || part.content?.trim().isNotEmpty != true;
+  }
+  return false;
+}
+
+String _toolGroupTitle(BuildContext context, int count) {
+  final isZh = Localizations.localeOf(context).languageCode == 'zh';
+  if (isZh) return '工具调用 · $count 次';
+  return count == 1 ? '1 tool call' : '$count tool calls';
+}
+
+String _toolGroupPreview(BuildContext context, List<ToolUIPart> parts) {
+  if (parts.isEmpty) return '';
+  final names = <String>[];
+  for (final part in parts) {
+    final title = _toolTitleFor(
+      context,
+      part.toolName,
+      part.arguments,
+      isResult: !part.loading,
+    );
+    if (!names.contains(title)) names.add(title);
+    if (names.length == 3) break;
+  }
+  final isZh = Localizations.localeOf(context).languageCode == 'zh';
+  final remaining = parts.length - names.length;
+  if (remaining <= 0) return names.join(' · ');
+  return isZh
+      ? '${names.join(' · ')} · 另 $remaining 个'
+      : '${names.join(' · ')} · $remaining more';
 }
 
 String _prettyToolJson(String raw) {
@@ -337,7 +439,7 @@ void _showToolFullImage(BuildContext context, String path) {
 void _showToolDetail(BuildContext context, ToolUIPart part) {
   final cs = Theme.of(context).colorScheme;
   final l10n = AppLocalizations.of(context)!;
-  final argsPretty = const JsonEncoder.withIndent('  ').convert(part.arguments);
+  final argsPretty = _prettyToolArguments(part.arguments);
   final (cleanText, images) = _parseMcpImagePaths(part.content);
   final resultText = cleanText.isNotEmpty
       ? _prettyToolJson(cleanText)
@@ -1931,26 +2033,52 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     List<ToolUIPart> visibleTools, {
     List<ReasoningSegment>? reasoningSegments,
   }) {
+    final approvalService = context.watch<ToolApprovalService>();
     final segments =
         reasoningSegments ??
         widget.reasoningSegments ??
         const <ReasoningSegment>[];
-    if (segments.isEmpty) {
-      int toolCount = 0;
-      return visibleTools
-          .map(
-            (tool) => _TimelineStepData.tool(
-              tool: tool,
-              reasoningCountAfter: 0,
-              toolCountAfter: ++toolCount,
-            ),
-          )
-          .toList();
-    }
-
     final steps = <_TimelineStepData>[];
+    final groupedTools = <ToolUIPart>[];
     int reasoningCount = 0;
     int toolCount = 0;
+
+    void flushGroupedTools() {
+      if (groupedTools.isEmpty) return;
+      toolCount += groupedTools.length;
+      steps.add(
+        _TimelineStepData.toolGroup(
+          toolGroup: List<ToolUIPart>.of(groupedTools),
+          reasoningCountAfter: reasoningCount,
+          toolCountAfter: toolCount,
+        ),
+      );
+      groupedTools.clear();
+    }
+
+    void addTool(ToolUIPart tool) {
+      if (_toolPartNeedsStandaloneStep(approvalService, tool)) {
+        flushGroupedTools();
+        steps.add(
+          _TimelineStepData.tool(
+            tool: tool,
+            reasoningCountAfter: reasoningCount,
+            toolCountAfter: ++toolCount,
+          ),
+        );
+        return;
+      }
+      groupedTools.add(tool);
+    }
+
+    if (segments.isEmpty) {
+      for (final tool in visibleTools) {
+        addTool(tool);
+      }
+      flushGroupedTools();
+      return steps;
+    }
+
     int toolIndex = 0;
 
     for (int i = 0; i < segments.length; i++) {
@@ -1960,17 +2088,12 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
         visibleTools.length,
       );
       while (toolIndex < segmentToolStart && toolIndex < visibleTools.length) {
-        steps.add(
-          _TimelineStepData.tool(
-            tool: visibleTools[toolIndex],
-            reasoningCountAfter: reasoningCount,
-            toolCountAfter: ++toolCount,
-          ),
-        );
+        addTool(visibleTools[toolIndex]);
         toolIndex++;
       }
 
       if (segment.text.isNotEmpty) {
+        flushGroupedTools();
         steps.add(
           _TimelineStepData.reasoning(
             reasoning: segment,
@@ -1984,28 +2107,17 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
           ? segments[i + 1].toolStartIndex.clamp(0, visibleTools.length)
           : visibleTools.length;
       while (toolIndex < nextToolBoundary && toolIndex < visibleTools.length) {
-        steps.add(
-          _TimelineStepData.tool(
-            tool: visibleTools[toolIndex],
-            reasoningCountAfter: reasoningCount,
-            toolCountAfter: ++toolCount,
-          ),
-        );
+        addTool(visibleTools[toolIndex]);
         toolIndex++;
       }
     }
 
     while (toolIndex < visibleTools.length) {
-      steps.add(
-        _TimelineStepData.tool(
-          tool: visibleTools[toolIndex],
-          reasoningCountAfter: reasoningCount,
-          toolCountAfter: ++toolCount,
-        ),
-      );
+      addTool(visibleTools[toolIndex]);
       toolIndex++;
     }
 
+    flushGroupedTools();
     return steps;
   }
 
@@ -3372,25 +3484,45 @@ class _TimelineStepData {
     required this.reasoning,
     required this.reasoningCountAfter,
     required this.toolCountAfter,
-  }) : tool = null;
+  }) : kind = _TimelineStepKind.reasoning,
+       tool = null,
+       toolGroup = const <ToolUIPart>[];
 
   const _TimelineStepData.tool({
     required this.tool,
     required this.reasoningCountAfter,
     required this.toolCountAfter,
-  }) : reasoning = null;
+  }) : kind = _TimelineStepKind.tool,
+       reasoning = null,
+       toolGroup = const <ToolUIPart>[];
 
+  const _TimelineStepData.toolGroup({
+    required this.toolGroup,
+    required this.reasoningCountAfter,
+    required this.toolCountAfter,
+  }) : kind = _TimelineStepKind.toolGroup,
+       reasoning = null,
+       tool = null;
+
+  final _TimelineStepKind kind;
   final ReasoningSegment? reasoning;
   final ToolUIPart? tool;
+  final List<ToolUIPart> toolGroup;
   final int reasoningCountAfter;
   final int toolCountAfter;
 
-  bool get isReasoning => reasoning != null;
-  bool get isTool => tool != null;
-  bool get loading => reasoning?.loading ?? tool?.loading ?? false;
+  bool get isReasoning => kind == _TimelineStepKind.reasoning;
+  bool get isTool => kind == _TimelineStepKind.tool;
+  bool get isToolGroup => kind == _TimelineStepKind.toolGroup;
+  bool get loading =>
+      reasoning?.loading ??
+      tool?.loading ??
+      toolGroup.any((part) => part.loading);
 }
 
 enum _ReasoningStepState { collapsed, preview, expanded }
+
+enum _TimelineStepKind { reasoning, tool, toolGroup }
 
 const double _timelineStepPaddingV = 8;
 const double _timelineIconSize = 18;
@@ -3500,6 +3632,14 @@ class _ChainOfThoughtCardState extends State<_ChainOfThoughtCard> {
                   step: step.reasoning!,
                   isFirst: index == 0,
                   isLast: index == visibleSteps.length - 1,
+                );
+              }
+              if (step.isToolGroup) {
+                return _ChainOfThoughtToolGroupStep(
+                  parts: step.toolGroup,
+                  isFirst: index == 0,
+                  isLast: index == visibleSteps.length - 1,
+                  onRecoveredAnswer: widget.onRecoveredAnswer,
                 );
               }
               return _ChainOfThoughtToolStep(
@@ -3903,6 +4043,112 @@ class _ChainOfThoughtReasoningStepState
   }
 }
 
+class _ChainOfThoughtToolGroupStep extends StatefulWidget {
+  const _ChainOfThoughtToolGroupStep({
+    required this.parts,
+    required this.isFirst,
+    required this.isLast,
+    this.onRecoveredAnswer,
+  });
+
+  final List<ToolUIPart> parts;
+  final bool isFirst;
+  final bool isLast;
+  final Future<void> Function(ToolUIPart part, AskUserResult result)?
+  onRecoveredAnswer;
+
+  @override
+  State<_ChainOfThoughtToolGroupStep> createState() =>
+      _ChainOfThoughtToolGroupStepState();
+}
+
+class _ChainOfThoughtToolGroupStepState
+    extends State<_ChainOfThoughtToolGroupStep> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final fg = _chatSurfaceForegroundPalette(context);
+    final loading = widget.parts.any((part) => part.loading);
+    final title = _toolGroupTitle(context, widget.parts.length);
+    final preview = _toolGroupPreview(context, widget.parts);
+
+    final label = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _Shimmer(
+          enabled: loading,
+          child: Text(
+            title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: AppFontWeights.semibold,
+              color: fg.strong,
+            ),
+          ),
+        ),
+        if (!_expanded && preview.isNotEmpty) ...[
+          const SizedBox(height: 2),
+          Text(
+            preview,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(fontSize: 12, color: fg.medium),
+          ),
+        ],
+      ],
+    );
+
+    final icon = SizedBox(
+      width: 18,
+      height: 18,
+      child: Center(
+        child: loading
+            ? LoadingIndicator(
+                height: 12,
+                dotSize: 3,
+                spacing: 2,
+                color: fg.strong,
+              )
+            : Icon(Lucide.Wrench, size: 16, color: fg.strong),
+      ),
+    );
+
+    final content = Column(
+      mainAxisSize: MainAxisSize.min,
+      children: widget.parts
+          .map(
+            (part) => Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: _ToolCallItem(
+                part: part,
+                onRecoveredAnswer: widget.onRecoveredAnswer,
+              ),
+            ),
+          )
+          .toList(growable: false),
+    );
+
+    return _TimelineStepShell(
+      icon: icon,
+      label: label,
+      isFirst: widget.isFirst,
+      isLast: widget.isLast,
+      onTap: () => setState(() => _expanded = !_expanded),
+      indicator: Icon(
+        _expanded ? Lucide.ChevronUp : Lucide.ChevronDown,
+        size: 16,
+        color: fg.muted,
+      ),
+      content: content,
+      contentVisible: _expanded,
+    );
+  }
+}
+
 class _ChainOfThoughtToolStep extends StatefulWidget {
   const _ChainOfThoughtToolStep({
     required this.part,
@@ -3954,16 +4200,7 @@ class _ChainOfThoughtToolStepState extends State<_ChainOfThoughtToolStep> {
   }
 
   String _argsSummary(Map<String, dynamic> args) {
-    if (args.isEmpty) return '';
-    final entries = args.entries.take(2).map((entry) {
-      final value = entry.value?.toString() ?? '';
-      final truncated = value.length > 40
-          ? '${value.substring(0, 40)}...'
-          : value;
-      return '${entry.key}: $truncated';
-    });
-    final suffix = args.length > 2 ? ' ...' : '';
-    return entries.join(', ') + suffix;
+    return _toolArgumentsSummary(args);
   }
 
   void _showDenyDialog(
@@ -4012,18 +4249,10 @@ class _ChainOfThoughtToolStepState extends State<_ChainOfThoughtToolStep> {
     final fg = _chatSurfaceForegroundPalette(context);
     final settings = context.watch<SettingsProvider>();
     final approvalService = context.watch<ToolApprovalService>();
-    ToolApprovalRequest? pendingRequest;
-    if (widget.part.id.isNotEmpty &&
-        approvalService.isPending(widget.part.id)) {
-      pendingRequest = approvalService.pendingRequests[widget.part.id];
-    } else {
-      for (final request in approvalService.pendingRequests.values) {
-        if (request.toolName == widget.part.toolName) {
-          pendingRequest = request;
-          break;
-        }
-      }
-    }
+    final pendingRequest = _pendingApprovalForToolPart(
+      approvalService,
+      widget.part,
+    );
     final isPendingApproval = pendingRequest != null;
     final approvalRequest = pendingRequest;
 
@@ -4247,15 +4476,7 @@ class _ToolCallItemState extends State<_ToolCallItem> {
 
   /// Build a short argument summary for display in the approval card.
   String _argsSummary(Map<String, dynamic> args) {
-    if (args.isEmpty) return '';
-    // Show first 1-2 key=value pairs, truncated
-    final entries = args.entries.take(2).map((e) {
-      final v = e.value?.toString() ?? '';
-      final truncated = v.length > 40 ? '${v.substring(0, 40)}...' : v;
-      return '${e.key}: $truncated';
-    });
-    final suffix = args.length > 2 ? ' ...' : '';
-    return entries.join(', ') + suffix;
+    return _toolArgumentsSummary(args);
   }
 
   @override
@@ -4521,9 +4742,7 @@ class _ToolCallItemState extends State<_ToolCallItem> {
   void _showDetail(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final l10n = AppLocalizations.of(context)!;
-    final argsPretty = const JsonEncoder.withIndent(
-      '  ',
-    ).convert(widget.part.arguments);
+    final argsPretty = _prettyToolArguments(widget.part.arguments);
     final (cleanText, images) = _parseMcpImagePaths(widget.part.content);
     final resultText = cleanText.isNotEmpty
         ? _prettyJson(cleanText)

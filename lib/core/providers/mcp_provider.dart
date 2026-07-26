@@ -2,7 +2,12 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:mcp_client/mcp_client.dart' as mcp;
+import '../services/mcp/in_memory_mcp_server.dart';
 import '../services/mcp/kelivo_fetch/kelivo_fetch_server.dart';
+import '../services/mcp/kelivo_files/kelivo_files_server.dart';
+import '../services/mcp/kelivo_github/github_api_client.dart';
+import '../services/mcp/kelivo_github/kelivo_github_server.dart';
+import '../services/mcp/kelivo_images/kelivo_images_server.dart';
 import '../services/mcp/stdio_command_resolver.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
@@ -12,6 +17,60 @@ enum McpTransportType { sse, http, stdio, inmemory }
 
 /// Connection status for an MCP server.
 enum McpStatus { idle, connecting, connected, error }
+
+enum McpCallLogStatus { running, success, error }
+
+class McpCallLogEntry {
+  const McpCallLogEntry({
+    required this.id,
+    required this.serverId,
+    required this.serverName,
+    required this.toolName,
+    required this.startedAt,
+    required this.status,
+    required this.argumentsPreview,
+    this.finishedAt,
+    this.durationMs,
+    this.resultPreview,
+    this.error,
+    this.retried = false,
+  });
+
+  final String id;
+  final String serverId;
+  final String serverName;
+  final String toolName;
+  final DateTime startedAt;
+  final DateTime? finishedAt;
+  final int? durationMs;
+  final McpCallLogStatus status;
+  final String argumentsPreview;
+  final String? resultPreview;
+  final String? error;
+  final bool retried;
+
+  McpCallLogEntry copyWith({
+    DateTime? finishedAt,
+    int? durationMs,
+    McpCallLogStatus? status,
+    String? resultPreview,
+    String? error,
+    bool? retried,
+  }) => McpCallLogEntry(
+    id: id,
+    serverId: serverId,
+    serverName: serverName,
+    toolName: toolName,
+    startedAt: startedAt,
+    finishedAt: finishedAt ?? this.finishedAt,
+    durationMs: durationMs ?? this.durationMs,
+    status: status ?? this.status,
+    argumentsPreview: argumentsPreview,
+    resultPreview: resultPreview ?? this.resultPreview,
+    error: error ?? this.error,
+    retried: retried ?? this.retried,
+  );
+}
 
 class McpParamSpec {
   final String name;
@@ -244,6 +303,63 @@ class McpServerConfig {
 class McpProvider extends ChangeNotifier {
   static const String _prefsKey = 'mcp_servers_v1';
   static const String _prefsTimeoutKey = 'mcp_request_timeout_ms_v1';
+  static const String _githubTokenPrefsKey = 'mcp_github_token_v1';
+  static const String _builtinFetchId = 'kelivo_fetch';
+  static const String _builtinFetchName = '@kelivo/fetch';
+  static const String _builtinFilesId = 'kelivo_files';
+  static const String _builtinFilesName = '@kelivo/files';
+  static const String _builtinGithubId = 'kelivo_github';
+  static const String _builtinGithubName = '@kelivo/github';
+  static const String _builtinImagesId = 'kelivo_images';
+  static const String _builtinImagesName = '@kelivo/images';
+  static const Set<String> _builtinFileWriteToolNames = {
+    'kelivo_create_directory',
+    'kelivo_create_text_file',
+    'kelivo_write_text_file',
+    'kelivo_write_file_base64',
+    'kelivo_append_text_file',
+    'kelivo_delete_file',
+    'kelivo_delete_files',
+    'kelivo_move_file',
+    'kelivo_copy_file',
+    'kelivo_zip_files',
+    'kelivo_unzip_file',
+  };
+  static const Set<String> _builtinGithubWriteToolNames = {
+    'github_repository_write',
+    'github_issue_write',
+    'github_pull_request_write',
+    'github_release_write',
+    'github_actions_write',
+    'github_secrets_write',
+    'github_create_branch',
+    'github_create_or_update_file',
+    'github_delete_file',
+    'github_create_issue',
+    'github_update_issue',
+    'github_create_issue_comment',
+    'github_create_pull_request',
+    'github_create_repository',
+    'github_update_repository',
+    'github_delete_repository',
+    'github_fork_repository',
+    'github_update_pull_request',
+    'github_create_pr_review',
+    'github_create_pr_review_comment',
+    'github_merge_pull_request',
+    'github_delete_branch',
+    'github_create_release',
+    'github_update_release',
+    'github_delete_release',
+    'github_dispatch_workflow',
+    'github_rerun_workflow_run',
+    'github_cancel_workflow_run',
+    'github_put_repo_secret',
+    'github_delete_repo_secret',
+    'github_create_or_update_repo_variable',
+    'github_delete_repo_variable',
+  };
+  static const int _maxCallLogEntries = 80;
 
   final Map<String, mcp.Client> _clients = {};
   final Map<String, McpStatus> _status = {}; // id -> status
@@ -253,7 +369,10 @@ class McpProvider extends ChangeNotifier {
   final Set<String> _reconnecting = <String>{};
   // Heartbeat timers for live-connection health checks
   final Map<String, Timer> _heartbeats = <String, Timer>{};
+  final List<McpCallLogEntry> _callLogs = <McpCallLogEntry>[];
   Duration _requestTimeout = const Duration(seconds: 30);
+  String _githubToken = '';
+  bool _disposed = false;
   final McpStdioCommandResolver _stdioCommandResolver =
       McpStdioCommandResolver();
 
@@ -272,6 +391,16 @@ class McpProvider extends ChangeNotifier {
       .toList(growable: false);
   Duration get requestTimeout => _requestTimeout;
   int get requestTimeoutSeconds => _requestTimeout.inSeconds;
+  List<McpCallLogEntry> get callLogs => List.unmodifiable(_callLogs);
+  bool get hasCallLogs => _callLogs.isNotEmpty;
+  String get githubToken => _githubToken;
+  bool get hasGithubToken => _githubToken.trim().isNotEmpty;
+
+  @override
+  void notifyListeners() {
+    if (_disposed) return;
+    super.notifyListeners();
+  }
 
   Future<void> _load() async {
     final prefs = await SharedPreferences.getInstance();
@@ -279,6 +408,7 @@ class McpProvider extends ChangeNotifier {
     if (timeoutMs != null && timeoutMs > 0) {
       _requestTimeout = Duration(milliseconds: timeoutMs);
     }
+    _githubToken = prefs.getString(_githubTokenPrefsKey)?.trim() ?? '';
     final raw = prefs.getString(_prefsKey);
     if (raw != null && raw.isNotEmpty) {
       try {
@@ -291,8 +421,7 @@ class McpProvider extends ChangeNotifier {
         _servers = list;
       } catch (_) {}
     }
-    // Ensure built-in @kelivo/fetch is present by default
-    _ensureBuiltinFetchServerPresent();
+    _ensureBuiltinServersPresent();
     // initialize statuses
     for (final s in _servers) {
       _status[s.id] = McpStatus.idle;
@@ -300,29 +429,106 @@ class McpProvider extends ChangeNotifier {
     }
     notifyListeners();
 
-    // Auto-connect enabled servers
-    for (final s in _servers.where((e) => e.enabled)) {
+    // Auto-connect enabled servers. Keep file access opt-in so app startup stays
+    // identical to the original built-in fetch behavior until the user enables it.
+    for (final s in _autoConnectServers()) {
       // fire and forget
       unawaited(connect(s.id));
     }
   }
 
-  void _ensureBuiltinFetchServerPresent() {
-    final exists = _servers.any(
+  void _ensureBuiltinServersPresent() {
+    final next = List<McpServerConfig>.of(_servers);
+    if (!_hasBuiltinServer(_builtinFetchId, _builtinFetchName)) {
+      next.add(_builtinServer(_builtinFetchId, _builtinFetchName));
+    }
+    if (!_hasBuiltinServer(_builtinFilesId, _builtinFilesName)) {
+      next.add(
+        _builtinServer(_builtinFilesId, _builtinFilesName, enabled: false),
+      );
+    }
+    if (!_hasBuiltinServer(_builtinGithubId, _builtinGithubName)) {
+      next.add(
+        _builtinServer(_builtinGithubId, _builtinGithubName, enabled: false),
+      );
+    }
+    if (!_hasBuiltinServer(_builtinImagesId, _builtinImagesName)) {
+      next.add(
+        _builtinServer(_builtinImagesId, _builtinImagesName, enabled: false),
+      );
+    }
+    _servers = next;
+  }
+
+  Iterable<McpServerConfig> _autoConnectServers() {
+    return _servers.where(
       (s) =>
-          s.transport == McpTransportType.inmemory ||
-          s.name == '@kelivo/fetch' ||
-          s.id == 'kelivo_fetch',
+          s.enabled && !_isBuiltinFilesServer(s) && !_isBuiltinImagesServer(s),
     );
-    if (exists) return;
-    final cfg = McpServerConfig(
-      id: 'kelivo_fetch',
-      enabled: true,
-      name: '@kelivo/fetch',
+  }
+
+  bool _hasBuiltinServer(String id, String name) {
+    return _servers.any(
+      (s) =>
+          s.transport == McpTransportType.inmemory &&
+          (s.id == id || s.name == name),
+    );
+  }
+
+  McpServerConfig _builtinServer(
+    String id,
+    String name, {
+    bool enabled = true,
+  }) {
+    return McpServerConfig(
+      id: id,
+      enabled: enabled,
+      name: name,
       transport: McpTransportType.inmemory,
-      tools: const <McpToolConfig>[], // will refresh on connect
+      tools: const <McpToolConfig>[],
     );
-    _servers = [..._servers, cfg];
+  }
+
+  bool _isBuiltinFilesServer(McpServerConfig server) {
+    return server.transport == McpTransportType.inmemory &&
+        (server.id == _builtinFilesId || server.name == _builtinFilesName);
+  }
+
+  bool _isBuiltinImagesServer(McpServerConfig server) {
+    return server.transport == McpTransportType.inmemory &&
+        (server.id == _builtinImagesId || server.name == _builtinImagesName);
+  }
+
+  bool _isBuiltinGithubServer(McpServerConfig server) {
+    return server.transport == McpTransportType.inmemory &&
+        (server.id == _builtinGithubId || server.name == _builtinGithubName);
+  }
+
+  bool isBuiltinServer(McpServerConfig server) {
+    return _isBuiltinFetchServer(server) ||
+        _isBuiltinFilesServer(server) ||
+        _isBuiltinGithubServer(server) ||
+        _isBuiltinImagesServer(server);
+  }
+
+  bool isBuiltinGithubServer(McpServerConfig server) {
+    return _isBuiltinGithubServer(server);
+  }
+
+  bool _isBuiltinFetchServer(McpServerConfig server) {
+    return server.transport == McpTransportType.inmemory &&
+        (server.id == _builtinFetchId || server.name == _builtinFetchName);
+  }
+
+  KelivoInMemoryMcpServerEngine _createBuiltinEngine(McpServerConfig server) {
+    if (_isBuiltinFilesServer(server)) return KelivoFilesMcpServerEngine();
+    if (_isBuiltinImagesServer(server)) return KelivoImagesMcpServerEngine();
+    if (_isBuiltinGithubServer(server)) {
+      return KelivoGithubMcpServerEngine(
+        client: GitHubApiClient(accessTokenProvider: () async => _githubToken),
+      );
+    }
+    return KelivoFetchMcpServerEngine();
   }
 
   Future<void> _persist() async {
@@ -337,6 +543,25 @@ class McpProvider extends ChangeNotifier {
   Future<void> _persistTimeout() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(_prefsTimeoutKey, _requestTimeout.inMilliseconds);
+  }
+
+  Future<void> updateGithubToken(String token) async {
+    final normalized = token.trim();
+    if (normalized == _githubToken) return;
+    _githubToken = normalized;
+    final prefs = await SharedPreferences.getInstance();
+    if (normalized.isEmpty) {
+      await prefs.remove(_githubTokenPrefsKey);
+    } else {
+      await prefs.setString(_githubTokenPrefsKey, normalized);
+    }
+    notifyListeners();
+    for (final server in _servers) {
+      if (_isBuiltinGithubServer(server) && server.enabled) {
+        unawaited(reconnect(server.id));
+        break;
+      }
+    }
   }
 
   /// Export current MCP servers as a user-friendly JSON structure.
@@ -429,16 +654,28 @@ class McpProvider extends ChangeNotifier {
 
       if (serversFromMap != null) {
         final isDesktop = _isDesktopPlatform();
-        bool builtinSeen = false;
-        bool builtinEnabled = true;
+        final builtinEnabledById = <String, bool>{};
+        bool legacyBuiltinSeen = false;
+        bool legacyBuiltinEnabled = true;
         serversFromMap.forEach((id, cfgAny) {
           if (cfgAny is! Map) return;
           final cfg = cfgAny.cast<String, dynamic>();
           final typeLower = (cfg['type'] ?? '').toString().toLowerCase();
           if (typeLower == 'inmemory') {
-            // Built-in @kelivo/fetch control via isActive; ignore name mismatches silently
-            builtinSeen = true;
-            builtinEnabled = (cfg['isActive'] as bool?) ?? true;
+            final enabled = (cfg['isActive'] as bool?) ?? true;
+            final name = (cfg['name'] as String?)?.trim();
+            if (id == _builtinFilesId || name == _builtinFilesName) {
+              builtinEnabledById[_builtinFilesId] = enabled;
+            } else if (id == _builtinGithubId || name == _builtinGithubName) {
+              builtinEnabledById[_builtinGithubId] = enabled;
+            } else if (id == _builtinImagesId || name == _builtinImagesName) {
+              builtinEnabledById[_builtinImagesId] = enabled;
+            } else if (id == _builtinFetchId || name == _builtinFetchName) {
+              builtinEnabledById[_builtinFetchId] = enabled;
+            } else {
+              legacyBuiltinSeen = true;
+              legacyBuiltinEnabled = enabled;
+            }
             return;
           }
           final hasStdioShape =
@@ -518,15 +755,33 @@ class McpProvider extends ChangeNotifier {
             ),
           );
         });
-        if (builtinSeen) {
-          // Append single built-in server with fixed id/name
+        if (builtinEnabledById.isNotEmpty || legacyBuiltinSeen) {
           next.add(
-            McpServerConfig(
-              id: 'kelivo_fetch',
-              enabled: builtinEnabled,
-              name: '@kelivo/fetch',
-              transport: McpTransportType.inmemory,
+            _builtinServer(_builtinFetchId, _builtinFetchName).copyWith(
+              enabled:
+                  builtinEnabledById[_builtinFetchId] ?? legacyBuiltinEnabled,
             ),
+          );
+          next.add(
+            _builtinServer(
+              _builtinFilesId,
+              _builtinFilesName,
+              enabled: false,
+            ).copyWith(enabled: builtinEnabledById[_builtinFilesId] ?? false),
+          );
+          next.add(
+            _builtinServer(
+              _builtinGithubId,
+              _builtinGithubName,
+              enabled: false,
+            ).copyWith(enabled: builtinEnabledById[_builtinGithubId] ?? false),
+          );
+          next.add(
+            _builtinServer(
+              _builtinImagesId,
+              _builtinImagesName,
+              enabled: false,
+            ).copyWith(enabled: builtinEnabledById[_builtinImagesId] ?? false),
           );
         }
       } else if (data is List) {
@@ -605,7 +860,7 @@ class McpProvider extends ChangeNotifier {
     notifyListeners();
 
     // Auto-connect enabled servers
-    for (final s in _servers.where((e) => e.enabled)) {
+    for (final s in _autoConnectServers()) {
       // fire and forget
       unawaited(connect(s.id));
     }
@@ -670,6 +925,8 @@ class McpProvider extends ChangeNotifier {
   }
 
   Future<void> removeServer(String id) async {
+    final current = getById(id);
+    if (current != null && isBuiltinServer(current)) return;
     await disconnect(id);
     _servers = _servers.where((e) => e.id != id).toList(growable: false);
     _status.remove(id);
@@ -736,7 +993,118 @@ class McpProvider extends ChangeNotifier {
     return false;
   }
 
+  void clearCallLogs() {
+    _callLogs.clear();
+    notifyListeners();
+  }
+
+  String _beginCallLog({
+    required String serverId,
+    required String toolName,
+    required Map<String, dynamic> arguments,
+  }) {
+    final server = getById(serverId);
+    final id = '${toolName}_${DateTime.now().microsecondsSinceEpoch}';
+    _callLogs.insert(
+      0,
+      McpCallLogEntry(
+        id: id,
+        serverId: serverId,
+        serverName: server?.name ?? serverId,
+        toolName: toolName,
+        startedAt: DateTime.now(),
+        status: McpCallLogStatus.running,
+        argumentsPreview: _previewJson(arguments),
+      ),
+    );
+    if (_callLogs.length > _maxCallLogEntries) {
+      _callLogs.removeRange(_maxCallLogEntries, _callLogs.length);
+    }
+    notifyListeners();
+    return id;
+  }
+
+  void _finishCallLog(
+    String id, {
+    required McpCallLogStatus status,
+    String? resultPreview,
+    String? error,
+    bool retried = false,
+  }) {
+    final idx = _callLogs.indexWhere((entry) => entry.id == id);
+    if (idx < 0) return;
+    final now = DateTime.now();
+    final current = _callLogs[idx];
+    _callLogs[idx] = current.copyWith(
+      finishedAt: now,
+      durationMs: now.difference(current.startedAt).inMilliseconds,
+      status: status,
+      resultPreview: resultPreview,
+      error: error,
+      retried: retried,
+    );
+    notifyListeners();
+  }
+
+  static String _previewJson(dynamic value, {int maxLength = 1200}) {
+    String text;
+    try {
+      text = const JsonEncoder.withIndent(
+        '  ',
+      ).convert(_redactSensitive(value));
+    } catch (_) {
+      text = value.toString();
+    }
+    if (text.length <= maxLength) return text;
+    return '${text.substring(0, maxLength)}…';
+  }
+
+  static dynamic _redactSensitive(dynamic value) {
+    if (value is List) return value.map(_redactSensitive).toList();
+    if (value is! Map) return value;
+    return value.map((key, entryValue) {
+      final keyText = key.toString().toLowerCase();
+      final sensitive =
+          keyText.contains('key') ||
+          keyText.contains('token') ||
+          keyText.contains('secret') ||
+          keyText.contains('password') ||
+          keyText.contains('authorization') ||
+          keyText.contains('cookie');
+      return MapEntry(
+        key.toString(),
+        sensitive ? '***' : _redactSensitive(entryValue),
+      );
+    });
+  }
+
+  static String _previewCallToolResult(mcp.CallToolResult result) {
+    final buf = StringBuffer();
+    for (final content in result.content.take(3)) {
+      try {
+        if (content is mcp.TextContent) {
+          final text = content.text.trim();
+          if (text.isNotEmpty) buf.writeln(text);
+          continue;
+        }
+        if (content is mcp.ImageContent) {
+          buf.writeln('[image ${content.mimeType}]');
+          continue;
+        }
+        if (content is mcp.ResourceContent) {
+          buf.writeln('[resource ${content.uri}]');
+          continue;
+        }
+        buf.writeln(content.toString());
+      } catch (_) {}
+    }
+    final text = buf.toString().trim();
+    if (text.isEmpty) return '(empty result)';
+    return text.length <= 1600 ? text : '${text.substring(0, 1600)}…';
+  }
+
   Future<void> connect(String id) async {
+    if (_disposed) return;
     final server = _servers.firstWhere(
       (e) => e.id == id,
       orElse: () => throw StateError('Server not found'),
@@ -777,10 +1145,16 @@ class McpProvider extends ChangeNotifier {
 
       // In-memory builtin server path
       if (server.transport == McpTransportType.inmemory) {
-        final engine = KelivoFetchMcpServerEngine();
+        final engine = _createBuiltinEngine(server);
         final transport = KelivoInMemoryClientTransport(engine);
         final client = mcp.McpClient.createClient(clientConfig);
         await client.connect(transport);
+        if (_disposed) {
+          try {
+            client.disconnect();
+          } catch (_) {}
+          return;
+        }
         _clients[id] = client;
         _status[id] = McpStatus.connected;
         _errors.remove(id);
@@ -840,6 +1214,12 @@ class McpProvider extends ChangeNotifier {
       );
 
       final client = clientResult.fold((c) => c, (err) => throw err);
+      if (_disposed) {
+        try {
+          client.disconnect();
+        } catch (_) {}
+        return;
+      }
       _clients[id] = client;
       _status[id] = McpStatus.connected;
       _errors.remove(id);
@@ -852,8 +1232,9 @@ class McpProvider extends ChangeNotifier {
       // debugPrint('[MCP/Tools] refresh done for id=$id');
 
       // Start/refresh heartbeat for this connection
-      _startHeartbeat(id);
+      if (!_disposed) _startHeartbeat(id);
     } catch (e) {
+      if (_disposed) return;
       // debugPrint('[MCP/Error] connect failed for id=$id (${server.name})');
       // _logMcpException('connect', serverId: id, error: e, stack: st);
       _status[id] = McpStatus.error;
@@ -1297,7 +1678,12 @@ class McpProvider extends ChangeNotifier {
             description: t.description,
             params: params,
             schema: schemaJson,
-            needsApproval: prior?.needsApproval ?? false,
+            needsApproval:
+                prior?.needsApproval ??
+                (_isBuiltinFilesServer(_servers[idx]) &&
+                        _builtinFileWriteToolNames.contains(t.name)) ||
+                    (_isBuiltinGithubServer(_servers[idx]) &&
+                        _builtinGithubWriteToolNames.contains(t.name)),
           ),
         );
       }
@@ -1325,10 +1711,22 @@ class McpProvider extends ChangeNotifier {
     String toolName,
     Map<String, dynamic> args,
   ) async {
+    final logId = _beginCallLog(
+      serverId: serverId,
+      toolName: toolName,
+      arguments: args,
+    );
     try {
       await ensureConnected(serverId);
       var client = _clients[serverId];
-      if (client == null) return null;
+      if (client == null) {
+        _finishCallLog(
+          logId,
+          status: McpCallLogStatus.error,
+          error: 'Server is not connected.',
+        );
+        return null;
+      }
       // Normalize arguments based on tool schema (best-effort)
       final normalized = _normalizeArgsForTool(serverId, toolName, args);
       // if (normalized != args) {
@@ -1338,6 +1736,11 @@ class McpProvider extends ChangeNotifier {
       // }
       final result = await client.callTool(toolName, normalized);
       // Detailed call timing/content logging disabled
+      _finishCallLog(
+        logId,
+        status: McpCallLogStatus.success,
+        resultPreview: _previewCallToolResult(result),
+      );
       return result;
     } catch (e) {
       // debugPrint('[MCP/Call/Error] serverId=$serverId tool=$toolName');
@@ -1348,6 +1751,11 @@ class McpProvider extends ChangeNotifier {
           // Keep connection healthy status; surface error to caller via null
           _errors[serverId] = e.toString();
           // debugPrint('[MCP/Call] invalid arguments; skipping reconnect');
+          _finishCallLog(
+            logId,
+            status: McpCallLogStatus.error,
+            error: e.toString(),
+          );
           return null;
         }
       } catch (_) {}
@@ -1358,9 +1766,25 @@ class McpProvider extends ChangeNotifier {
       // Auto-reconnect a few times and try once more
       try {
         await _reconnectWithBackoff(serverId, maxAttempts: 3);
-        if (!isConnected(serverId)) return null;
+        if (!isConnected(serverId)) {
+          _finishCallLog(
+            logId,
+            status: McpCallLogStatus.error,
+            error: _errors[serverId] ?? 'Server did not reconnect.',
+            retried: true,
+          );
+          return null;
+        }
         final client = _clients[serverId];
-        if (client == null) return null;
+        if (client == null) {
+          _finishCallLog(
+            logId,
+            status: McpCallLogStatus.error,
+            error: 'Server is not connected after retry.',
+            retried: true,
+          );
+          return null;
+        }
         // debugPrint('[MCP/Call] retry serverId=$serverId tool=$toolName');
         final normalized = _normalizeArgsForTool(serverId, toolName, args);
         final result = await client.callTool(toolName, normalized);
@@ -1369,10 +1793,22 @@ class McpProvider extends ChangeNotifier {
         _status[serverId] = McpStatus.connected;
         _errors.remove(serverId);
         notifyListeners();
+        _finishCallLog(
+          logId,
+          status: McpCallLogStatus.success,
+          resultPreview: _previewCallToolResult(result),
+          retried: true,
+        );
         return result;
       } catch (e2) {
         // debugPrint('[MCP/Call/RetryError] serverId=$serverId tool=$toolName');
         // Keep error state; give up
+        _finishCallLog(
+          logId,
+          status: McpCallLogStatus.error,
+          error: e2.toString(),
+          retried: true,
+        );
         return null;
       }
     }
@@ -1391,6 +1827,7 @@ class McpProvider extends ChangeNotifier {
 
   @override
   void dispose() {
+    _disposed = true;
     // Clean up timers
     for (final t in _heartbeats.values) {
       t.cancel();

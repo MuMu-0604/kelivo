@@ -47,6 +47,16 @@ class DesktopMcpPane extends StatelessWidget {
                         ),
                       ),
                       Tooltip(
+                        message: 'MCP 调用日志',
+                        child: _SmallIconBtn(
+                          icon: lucide.Lucide.History,
+                          onTap: () async {
+                            await _showCallLogs(context);
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Tooltip(
                         message: l10n.mcpTimeoutSettingsTooltip,
                         child: _SmallIconBtn(
                           icon: lucide.Lucide.Timer,
@@ -545,6 +555,224 @@ Future<void> _showErrorDetails(
       );
     },
   );
+}
+
+Future<void> _showCallLogs(BuildContext context) async {
+  final cs = Theme.of(context).colorScheme;
+  await showDialog<void>(
+    context: context,
+    barrierDismissible: true,
+    builder: (ctx) {
+      return Dialog(
+        backgroundColor: cs.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 760, maxHeight: 720),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+            child: Consumer<McpProvider>(
+              builder: (context, mcp, _) {
+                final logs = mcp.callLogs;
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'MCP 调用日志',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: AppFontWeights.emphasis,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                '仅保留最近 ${logs.length} 条内存日志',
+                                style: TextStyle(
+                                  color: cs.onSurface.withValues(alpha: 0.62),
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (logs.isNotEmpty)
+                          TextButton(
+                            onPressed: mcp.clearCallLogs,
+                            child: const Text('清空'),
+                          ),
+                        const SizedBox(width: 6),
+                        _SmallIconBtn(
+                          icon: lucide.Lucide.X,
+                          onTap: () => Navigator.of(ctx).maybePop(),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Expanded(
+                      child: logs.isEmpty
+                          ? Center(
+                              child: Text(
+                                '暂无调用记录',
+                                style: TextStyle(
+                                  color: cs.onSurface.withValues(alpha: 0.58),
+                                ),
+                              ),
+                            )
+                          : ListView.separated(
+                              itemCount: logs.length,
+                              separatorBuilder: (_, __) =>
+                                  const SizedBox(height: 10),
+                              itemBuilder: (context, index) =>
+                                  _DesktopMcpCallLogCard(entry: logs[index]),
+                            ),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+        ),
+      );
+    },
+  );
+}
+
+class _DesktopMcpCallLogCard extends StatelessWidget {
+  const _DesktopMcpCallLogCard({required this.entry});
+
+  final McpCallLogEntry entry;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final statusColor = switch (entry.status) {
+      McpCallLogStatus.success => Colors.green,
+      McpCallLogStatus.error => Colors.redAccent,
+      McpCallLogStatus.running => cs.primary,
+    };
+    final statusText = switch (entry.status) {
+      McpCallLogStatus.success => '成功',
+      McpCallLogStatus.error => '失败',
+      McpCallLogStatus.running => '运行中',
+    };
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? Colors.white10 : const Color(0xFFF9FAFB),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.16)),
+      ),
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                entry.status == McpCallLogStatus.error
+                    ? lucide.Lucide.MessageCircleWarning
+                    : lucide.Lucide.Activity,
+                size: 18,
+                color: statusColor,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  entry.toolName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontWeight: AppFontWeights.emphasis),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                statusText,
+                style: TextStyle(
+                  color: statusColor,
+                  fontWeight: AppFontWeights.emphasis,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            '${entry.serverName} · ${_formatLogTime(entry.startedAt)}${entry.durationMs == null ? '' : ' · ${entry.durationMs}ms'}${entry.retried ? ' · 已重试' : ''}',
+            style: TextStyle(
+              color: cs.onSurface.withValues(alpha: 0.58),
+              fontSize: 12,
+            ),
+          ),
+          const SizedBox(height: 10),
+          _DesktopLogPreviewBlock(title: '参数', text: entry.argumentsPreview),
+          if ((entry.error ?? '').isNotEmpty) ...[
+            const SizedBox(height: 8),
+            _DesktopLogPreviewBlock(title: '错误', text: entry.error!),
+          ] else if ((entry.resultPreview ?? '').isNotEmpty) ...[
+            const SizedBox(height: 8),
+            _DesktopLogPreviewBlock(title: '结果', text: entry.resultPreview!),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _DesktopLogPreviewBlock extends StatelessWidget {
+  const _DesktopLogPreviewBlock({required this.title, required this.text});
+
+  final String title;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: isDark ? Colors.black12 : Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.18)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 11,
+              color: cs.onSurface.withValues(alpha: 0.54),
+              fontWeight: AppFontWeights.emphasis,
+            ),
+          ),
+          const SizedBox(height: 4),
+          SelectableText(
+            text,
+            maxLines: 8,
+            style: TextStyle(
+              fontSize: 12,
+              height: 1.35,
+              color: cs.onSurface.withValues(alpha: 0.82),
+              fontFamily: 'monospace',
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+String _formatLogTime(DateTime dt) {
+  String two(int value) => value.toString().padLeft(2, '0');
+  return '${two(dt.hour)}:${two(dt.minute)}:${two(dt.second)}';
 }
 
 Future<bool?> _confirmDelete(BuildContext context) async {

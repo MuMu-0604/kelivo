@@ -5,7 +5,7 @@ import '../../providers/settings_provider.dart';
 
 class SearchToolService {
   static const String toolName = 'search_web';
-  static const String toolDescription = 'Search the web for information';
+  static const String toolDescription = '联网搜索信息。';
 
   static final RegExp _schemeRe = RegExp(r'^[a-zA-Z][a-zA-Z0-9+.-]*:');
 
@@ -37,10 +37,7 @@ class SearchToolService {
         'parameters': {
           'type': 'object',
           'properties': {
-            'query': {
-              'type': 'string',
-              'description': 'The search query to look up online',
-            },
+            'query': {'type': 'string', 'description': '要在线搜索的查询内容。'},
           },
           'required': ['query'],
         },

@@ -166,6 +166,7 @@ class MessageGenerationService {
 
     // Inject prompts
     messageBuilderService.injectSystemPrompt(apiMessages, assistant, modelId);
+    await messageBuilderService.injectSkillPrompts(apiMessages, assistant);
     await messageBuilderService.injectMemoryAndRecentChats(
       apiMessages,
       assistant,

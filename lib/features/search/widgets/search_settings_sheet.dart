@@ -489,6 +489,9 @@ class _BrandBadge extends StatelessWidget {
 
   static String _nameForService(SearchServiceOptions s) {
     if (s is BingLocalOptions) return 'bing';
+    if (s is BaiduLocalOptions) return 'baidu';
+    if (s is SogouLocalOptions) return 'sogou';
+    if (s is So360LocalOptions) return '360';
     if (s is DuckDuckGoOptions) return 'duckduckgo';
     if (s is TavilyOptions) return 'tavily';
     if (s is ExaOptions) return 'exa';

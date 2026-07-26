@@ -1955,5 +1955,45 @@
         "type": "int"
       }
     }
-  }
+  },
+  "assistantEditPageSkillsTab": "技能",
+  "assistantEditSkillsEmptyMessage": "還沒有安裝技能。先匯入一個技能檔案吧。",
+  "assistantEditManageSkillsButton": "管理技能",
+  "skillsTitle": "技能",
+  "skillsImportTooltip": "匯入技能",
+  "skillsAddTooltip": "新增技能",
+  "skillsEmptyMessage": "支援匯入 Markdown、JSON、YAML、PDF、DOCX 或 ZIP 技能檔案。",
+  "skillsImportButton": "匯入技能",
+  "skillsDeleteAction": "刪除",
+  "skillsImportFailed": "技能匯入失敗：{error}",
+  "@skillsImportFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "skillsNoValidImported": "沒有匯入有效的技能檔案。",
+  "skillsImportedCount": "已匯入 {count} 個技能。",
+  "@skillsImportedCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "skillsTriggersLine": "觸發詞：{keywords}",
+  "@skillsTriggersLine": {
+    "placeholders": {
+      "keywords": {
+        "type": "String"
+      }
+    }
+  },
+  "skillsSaveButton": "儲存",
+  "skillsNameLabel": "名稱",
+  "skillsDescriptionLabel": "描述",
+  "skillsTriggerKeywordsLabel": "觸發關鍵詞",
+  "skillsTriggerKeywordsHint": "程式碼審查、DCF、潤飾",
+  "skillsContentHint": "在這裡貼上技能指令。"
 }

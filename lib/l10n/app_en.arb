@@ -2378,5 +2378,45 @@
         "type": "int"
       }
     }
-  }
+  },
+  "assistantEditPageSkillsTab": "Skills",
+  "assistantEditSkillsEmptyMessage": "No skills installed yet. Import a skill file first.",
+  "assistantEditManageSkillsButton": "Manage Skills",
+  "skillsTitle": "Skills",
+  "skillsImportTooltip": "Import Skills",
+  "skillsAddTooltip": "Add Skill",
+  "skillsEmptyMessage": "Import Markdown, JSON, YAML, PDF, DOCX, or ZIP skills.",
+  "skillsImportButton": "Import Skill",
+  "skillsDeleteAction": "Delete",
+  "skillsImportFailed": "Skills import failed: {error}",
+  "@skillsImportFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "skillsNoValidImported": "No valid skill files imported.",
+  "skillsImportedCount": "Imported {count} skill(s).",
+  "@skillsImportedCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "skillsTriggersLine": "Triggers: {keywords}",
+  "@skillsTriggersLine": {
+    "placeholders": {
+      "keywords": {
+        "type": "String"
+      }
+    }
+  },
+  "skillsSaveButton": "Save",
+  "skillsNameLabel": "Name",
+  "skillsDescriptionLabel": "Description",
+  "skillsTriggerKeywordsLabel": "Trigger keywords",
+  "skillsTriggerKeywordsHint": "code review, dcf, rewrite",
+  "skillsContentHint": "Paste skill instructions here."
 }

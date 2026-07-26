@@ -588,6 +588,7 @@ class _BrandBadge extends StatelessWidget {
   }
 
   static String _nameForService(SearchServiceOptions s) {
+    if (s is HybridLocalSearchOptions) return 'hybrid local';
     if (s is BingLocalOptions) return 'bing';
     if (s is DuckDuckGoOptions) return 'duckduckgo';
     if (s is TavilyOptions) return 'tavily';
@@ -879,6 +880,8 @@ class _AddServiceDialogState extends State<_AddServiceDialog> {
             decoration: deco(l10n.searchServicesAddDialogRegionOptional),
           ),
         ];
+      case 'hybrid_local':
+        return [];
       case 'tavily':
         return [
           TextField(
@@ -1062,6 +1065,8 @@ class _AddServiceDialogState extends State<_AddServiceDialog> {
           id: id,
           region: region.isEmpty ? 'us-en' : region,
         );
+      case 'hybrid_local':
+        return HybridLocalSearchOptions(id: id);
       case 'exa':
         return ExaOptions(
           id: id,
@@ -1555,6 +1560,7 @@ class _ServiceTypeChips extends StatefulWidget {
 
 class _ServiceTypeChipsState extends State<_ServiceTypeChips> {
   static const List<({String type, String brand})> _types = [
+    (type: 'hybrid_local', brand: 'hybrid local'),
     (type: 'bing_local', brand: 'bing'),
     (type: 'duckduckgo', brand: 'duckduckgo'),
     (type: 'tavily', brand: 'tavily'),
@@ -1623,6 +1629,8 @@ class _ServiceTypeChipsState extends State<_ServiceTypeChips> {
 String _serviceTypeName(BuildContext context, String type) {
   final l10n = AppLocalizations.of(context)!;
   switch (type) {
+    case 'hybrid_local':
+      return 'Local Hybrid Search';
     case 'bing_local':
       return l10n.searchServiceNameBingLocal;
     case 'duckduckgo':

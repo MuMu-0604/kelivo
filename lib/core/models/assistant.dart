@@ -36,6 +36,8 @@ class Assistant {
   final bool searchEnabled; // per-assistant external web search switch
   final List<String> mcpServerIds; // bound MCP server IDs
   final List<String> localToolIds; // enabled local tool IDs
+  final List<String> skillIds; // enabled reusable skill IDs
+  final bool appControlEnabled; // allow this assistant to control app config
   final String? background; // chat background (color/image ref)
   // Custom request overrides (per assistant)
   final List<Map<String, String>>
@@ -71,6 +73,8 @@ class Assistant {
     this.searchEnabled = false,
     this.mcpServerIds = const <String>[],
     this.localToolIds = const <String>[],
+    this.skillIds = const <String>[],
+    this.appControlEnabled = false,
     this.background,
     this.customHeaders = const <Map<String, String>>[],
     this.customBody = const <Map<String, String>>[],
@@ -101,6 +105,8 @@ class Assistant {
     bool? searchEnabled,
     List<String>? mcpServerIds,
     List<String>? localToolIds,
+    List<String>? skillIds,
+    bool? appControlEnabled,
     String? background,
     List<Map<String, String>>? customHeaders,
     List<Map<String, String>>? customBody,
@@ -141,6 +147,8 @@ class Assistant {
       searchEnabled: searchEnabled ?? this.searchEnabled,
       mcpServerIds: mcpServerIds ?? this.mcpServerIds,
       localToolIds: localToolIds ?? this.localToolIds,
+      skillIds: skillIds ?? this.skillIds,
+      appControlEnabled: appControlEnabled ?? this.appControlEnabled,
       background: clearBackground ? null : (background ?? this.background),
       customHeaders: customHeaders ?? this.customHeaders,
       customBody: customBody ?? this.customBody,
@@ -174,6 +182,8 @@ class Assistant {
     'searchEnabled': searchEnabled,
     'mcpServerIds': mcpServerIds,
     'localToolIds': localToolIds,
+    'skillIds': skillIds,
+    'appControlEnabled': appControlEnabled,
     'background': background,
     'customHeaders': customHeaders,
     'customBody': customBody,
@@ -206,6 +216,8 @@ class Assistant {
         (json['mcpServerIds'] as List?)?.cast<String>() ?? const <String>[],
     localToolIds:
         (json['localToolIds'] as List?)?.cast<String>() ?? const <String>[],
+    skillIds: (json['skillIds'] as List?)?.cast<String>() ?? const <String>[],
+    appControlEnabled: json['appControlEnabled'] as bool? ?? false,
     background: json['background'] as String?,
     customHeaders: (() {
       final raw = json['customHeaders'];

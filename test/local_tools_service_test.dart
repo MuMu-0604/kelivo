@@ -37,6 +37,18 @@ void main() {
       expect(assistant.localToolIds, isEmpty);
     });
 
+    test('assistant defaults to no skills', () {
+      const assistant = Assistant(id: 'a1', name: 'Assistant');
+
+      expect(assistant.skillIds, isEmpty);
+    });
+
+    test('assistant defaults to app control disabled', () {
+      const assistant = Assistant(id: 'a1', name: 'Assistant');
+
+      expect(assistant.appControlEnabled, isFalse);
+    });
+
     test('assistant defaults to web search disabled', () {
       const assistant = Assistant(id: 'a1', name: 'Assistant');
 
@@ -86,6 +98,30 @@ void main() {
         LocalToolNames.timeInfo,
         LocalToolNames.clipboard,
       ]);
+    });
+
+    test('assistant json round trips enabled skills', () {
+      const assistant = Assistant(
+        id: 'a1',
+        name: 'Assistant',
+        skillIds: ['skill-a', 'skill-b'],
+      );
+
+      final decoded = Assistant.fromJson(assistant.toJson());
+
+      expect(decoded.skillIds, const ['skill-a', 'skill-b']);
+    });
+
+    test('assistant json round trips app control permission', () {
+      const assistant = Assistant(
+        id: 'a1',
+        name: 'Assistant',
+        appControlEnabled: true,
+      );
+
+      final decoded = Assistant.fromJson(assistant.toJson());
+
+      expect(decoded.appControlEnabled, isTrue);
     });
 
     test(

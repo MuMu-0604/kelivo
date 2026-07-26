@@ -11,6 +11,7 @@ import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../core/services/haptics.dart';
 import '../../../theme/app_font_weights.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 class McpPage extends StatelessWidget {
   const McpPage({super.key});
@@ -148,6 +149,124 @@ class McpPage extends StatelessWidget {
       );
     }
 
+    Future<void> showCallLogs() async {
+      final cs = Theme.of(context).colorScheme;
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: cs.surface,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+        ),
+        builder: (ctx) {
+          return SafeArea(
+            top: false,
+            child: DraggableScrollableSheet(
+              expand: false,
+              initialChildSize: 0.78,
+              minChildSize: 0.38,
+              maxChildSize: 0.94,
+              builder: (context, scrollController) {
+                return Consumer<McpProvider>(
+                  builder: (context, provider, _) {
+                    final logs = provider.callLogs;
+                    return Column(
+                      children: [
+                        const SizedBox(height: 8),
+                        Container(
+                          width: 40,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: cs.onSurface.withValues(alpha: 0.18),
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'MCP 调用日志',
+                                      style: TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: AppFontWeights.emphasis,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      '仅保留最近 ${logs.length} 条内存日志',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: cs.onSurface.withValues(
+                                          alpha: 0.58,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              if (logs.isNotEmpty)
+                                TextButton(
+                                  onPressed: provider.clearCallLogs,
+                                  child: const Text('清空'),
+                                ),
+                              IconButton(
+                                tooltip: l10n.mcpPageClose,
+                                icon: const Icon(Lucide.X, size: 20),
+                                onPressed: () => Navigator.of(ctx).maybePop(),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Expanded(
+                          child: logs.isEmpty
+                              ? Center(
+                                  child: Text(
+                                    '暂无调用记录',
+                                    style: TextStyle(
+                                      color: cs.onSurface.withValues(
+                                        alpha: 0.58,
+                                      ),
+                                    ),
+                                  ),
+                                )
+                              : ListView.separated(
+                                  controller: scrollController,
+                                  padding: const EdgeInsets.fromLTRB(
+                                    16,
+                                    4,
+                                    16,
+                                    20,
+                                  ),
+                                  itemCount: logs.length,
+                                  separatorBuilder: (_, __) =>
+                                      const SizedBox(height: 10),
+                                  itemBuilder: (context, index) {
+                                    return _McpCallLogCard(entry: logs[index]);
+                                  },
+                                ),
+                        ),
+                      ],
+                    );
+                  },
+                );
+              },
+            ),
+          );
+        },
+      );
+    }
+
+    Future<void> openFilePermissionGuide() async {
+      await Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const _FilePermissionGuidePage()),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         leading: Tooltip(
@@ -161,6 +280,26 @@ class McpPage extends StatelessWidget {
         ),
         title: Text(l10n.mcpAssistantSheetTitle),
         actions: [
+          Tooltip(
+            message: '文件权限引导',
+            child: _TactileIconButton(
+              icon: Lucide.Folder,
+              color: cs.onSurface,
+              size: 22,
+              onTap: openFilePermissionGuide,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Tooltip(
+            message: 'MCP 调用日志',
+            child: _TactileIconButton(
+              icon: Lucide.History,
+              color: cs.onSurface,
+              size: 22,
+              onTap: showCallLogs,
+            ),
+          ),
+          const SizedBox(width: 12),
           Tooltip(
             message: l10n.mcpTimeoutSettingsTooltip,
             child: _TactileIconButton(
@@ -213,6 +352,8 @@ class McpPage extends StatelessWidget {
                 final s = servers[index];
                 final st = mcp.statusFor(s.id);
                 final err = mcp.errorFor(s.id);
+                final isBuiltin = mcp.isBuiltinServer(s);
+                final isGithub = mcp.isBuiltinGithubServer(s);
 
                 Widget tagStyled(String text, {Color? color}) => Container(
                   padding: const EdgeInsets.symmetric(
@@ -394,6 +535,15 @@ class McpPage extends StatelessWidget {
                                                 alpha: 0.7,
                                               ),
                                             ),
+                                          if (isGithub)
+                                            tagStyled(
+                                              mcp.hasGithubToken
+                                                  ? 'Token 已配置'
+                                                  : 'Token 未配置',
+                                              color: mcp.hasGithubToken
+                                                  ? Colors.green
+                                                  : Colors.orange,
+                                            ),
                                         ],
                                       ),
                                       if (st == McpStatus.error &&
@@ -445,112 +595,439 @@ class McpPage extends StatelessWidget {
                   padding: const EdgeInsets.only(bottom: 10),
                   child: Slidable(
                     key: ValueKey('mcp-${s.id}'),
-                    endActionPane: ActionPane(
-                      motion: const StretchMotion(),
-                      extentRatio: 0.42,
-                      children: [
-                        CustomSlidableAction(
-                          autoClose: true,
-                          backgroundColor: Colors.transparent,
-                          child: Container(
-                            width: double.infinity,
-                            height: double.infinity,
-                            decoration: BoxDecoration(
-                              color:
-                                  Theme.of(context).brightness ==
-                                      Brightness.dark
-                                  ? cs.error.withValues(alpha: 0.22)
-                                  : cs.error.withValues(alpha: 0.14),
-                              // Match list card radius for consistency
-                              borderRadius: BorderRadius.circular(14),
-                              border: Border.all(
-                                color: cs.error.withValues(alpha: 0.35),
-                              ),
-                            ),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 8,
-                            ),
-                            alignment: Alignment.center,
-                            child: FittedBox(
-                              fit: BoxFit.scaleDown,
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    Lucide.Trash2,
-                                    color: cs.error,
-                                    size: 18,
-                                  ),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    l10n.mcpPageDelete,
-                                    style: TextStyle(
-                                      color: cs.error,
-                                      fontWeight: AppFontWeights.emphasis,
+                    enabled: !isBuiltin,
+                    endActionPane: isBuiltin
+                        ? null
+                        : ActionPane(
+                            motion: const StretchMotion(),
+                            extentRatio: 0.42,
+                            children: [
+                              CustomSlidableAction(
+                                autoClose: true,
+                                backgroundColor: Colors.transparent,
+                                child: Container(
+                                  width: double.infinity,
+                                  height: double.infinity,
+                                  decoration: BoxDecoration(
+                                    color:
+                                        Theme.of(context).brightness ==
+                                            Brightness.dark
+                                        ? cs.error.withValues(alpha: 0.22)
+                                        : cs.error.withValues(alpha: 0.14),
+                                    // Match list card radius for consistency
+                                    borderRadius: BorderRadius.circular(14),
+                                    border: Border.all(
+                                      color: cs.error.withValues(alpha: 0.35),
                                     ),
                                   ),
-                                ],
-                              ),
-                            ),
-                          ),
-                          onPressed: (_) async {
-                            final prov = context.read<McpProvider>();
-                            final prev = prov.getById(s.id);
-                            final ok = await showDialog<bool>(
-                              context: context,
-                              builder: (dctx) => AlertDialog(
-                                backgroundColor: cs.surface,
-                                title: Text(l10n.mcpPageConfirmDeleteTitle),
-                                content: Text(l10n.mcpPageConfirmDeleteContent),
-                                actions: [
-                                  TextButton(
-                                    onPressed: () =>
-                                        Navigator.of(dctx).pop(false),
-                                    child: Text(l10n.mcpPageCancel),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 8,
                                   ),
-                                  TextButton(
-                                    onPressed: () =>
-                                        Navigator.of(dctx).pop(true),
-                                    child: Text(l10n.mcpPageDelete),
+                                  alignment: Alignment.center,
+                                  child: FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          Lucide.Trash2,
+                                          color: cs.error,
+                                          size: 18,
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          l10n.mcpPageDelete,
+                                          style: TextStyle(
+                                            color: cs.error,
+                                            fontWeight: AppFontWeights.emphasis,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
-                                ],
-                              ),
-                            );
-                            if (ok != true) return;
-                            await prov.removeServer(s.id);
-                            if (!context.mounted) return;
-                            showAppSnackBar(
-                              context,
-                              message: l10n.mcpPageServerDeleted,
-                              type: NotificationType.info,
-                              actionLabel: l10n.mcpPageUndo,
-                              onAction: () {
-                                if (prev == null) return;
-                                Future(() async {
-                                  final newId = await prov.addServer(
-                                    enabled: prev.enabled,
-                                    name: prev.name,
-                                    transport: prev.transport,
-                                    url: prev.url,
-                                    headers: prev.headers,
+                                ),
+                                onPressed: (_) async {
+                                  final prov = context.read<McpProvider>();
+                                  final prev = prov.getById(s.id);
+                                  final ok = await showDialog<bool>(
+                                    context: context,
+                                    builder: (dctx) => AlertDialog(
+                                      backgroundColor: cs.surface,
+                                      title: Text(
+                                        l10n.mcpPageConfirmDeleteTitle,
+                                      ),
+                                      content: Text(
+                                        l10n.mcpPageConfirmDeleteContent,
+                                      ),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () =>
+                                              Navigator.of(dctx).pop(false),
+                                          child: Text(l10n.mcpPageCancel),
+                                        ),
+                                        TextButton(
+                                          onPressed: () =>
+                                              Navigator.of(dctx).pop(true),
+                                          child: Text(l10n.mcpPageDelete),
+                                        ),
+                                      ],
+                                    ),
                                   );
-                                  // Try to refresh tools when back online
-                                  try {
-                                    await prov.refreshTools(newId);
-                                  } catch (_) {}
-                                });
-                              },
-                            );
-                          },
-                        ),
-                      ],
-                    ),
+                                  if (ok != true) return;
+                                  await prov.removeServer(s.id);
+                                  if (!context.mounted) return;
+                                  showAppSnackBar(
+                                    context,
+                                    message: l10n.mcpPageServerDeleted,
+                                    type: NotificationType.info,
+                                    actionLabel: l10n.mcpPageUndo,
+                                    onAction: () {
+                                      if (prev == null) return;
+                                      Future(() async {
+                                        final newId = await prov.addServer(
+                                          enabled: prev.enabled,
+                                          name: prev.name,
+                                          transport: prev.transport,
+                                          url: prev.url,
+                                          headers: prev.headers,
+                                        );
+                                        // Try to refresh tools when back online
+                                        try {
+                                          await prov.refreshTools(newId);
+                                        } catch (_) {}
+                                      });
+                                    },
+                                  );
+                                },
+                              ),
+                            ],
+                          ),
                     child: row,
                   ),
                 );
               },
             ),
+    );
+  }
+}
+
+class _McpCallLogCard extends StatelessWidget {
+  const _McpCallLogCard({required this.entry});
+
+  final McpCallLogEntry entry;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final statusColor = switch (entry.status) {
+      McpCallLogStatus.success => Colors.green,
+      McpCallLogStatus.error => Colors.redAccent,
+      McpCallLogStatus.running => cs.primary,
+    };
+    final statusText = switch (entry.status) {
+      McpCallLogStatus.success => '成功',
+      McpCallLogStatus.error => '失败',
+      McpCallLogStatus.running => '运行中',
+    };
+    final time = _formatLogTime(entry.startedAt);
+    final duration = entry.durationMs == null ? '' : ' · ${entry.durationMs}ms';
+
+    Widget chip(String text, Color color) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: color.withValues(alpha: 0.32)),
+        ),
+        child: Text(
+          text,
+          style: TextStyle(
+            fontSize: 11,
+            color: color,
+            fontWeight: AppFontWeights.emphasis,
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? Colors.white10 : Colors.white.withValues(alpha: 0.96),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: cs.outlineVariant.withValues(alpha: isDark ? 0.12 : 0.08),
+        ),
+      ),
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: statusColor.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(9),
+                ),
+                alignment: Alignment.center,
+                child: Icon(
+                  entry.status == McpCallLogStatus.error
+                      ? Lucide.MessageCircleWarning
+                      : Lucide.Activity,
+                  size: 17,
+                  color: statusColor,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      entry.toolName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: AppFontWeights.emphasis,
+                        color: cs.onSurface,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${entry.serverName} · $time$duration${entry.retried ? ' · 已重试' : ''}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: cs.onSurface.withValues(alpha: 0.58),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              chip(statusText, statusColor),
+            ],
+          ),
+          const SizedBox(height: 10),
+          _LogPreviewBlock(title: '参数', text: entry.argumentsPreview),
+          if ((entry.error ?? '').isNotEmpty) ...[
+            const SizedBox(height: 8),
+            _LogPreviewBlock(title: '错误', text: entry.error!),
+          ] else if ((entry.resultPreview ?? '').isNotEmpty) ...[
+            const SizedBox(height: 8),
+            _LogPreviewBlock(title: '结果', text: entry.resultPreview!),
+          ],
+        ],
+      ),
+    );
+  }
+
+  static String _formatLogTime(DateTime dt) {
+    String two(int value) => value.toString().padLeft(2, '0');
+    return '${two(dt.hour)}:${two(dt.minute)}:${two(dt.second)}';
+  }
+}
+
+class _FilePermissionGuidePage extends StatefulWidget {
+  const _FilePermissionGuidePage();
+
+  @override
+  State<_FilePermissionGuidePage> createState() =>
+      _FilePermissionGuidePageState();
+}
+
+class _FilePermissionGuidePageState extends State<_FilePermissionGuidePage> {
+  PermissionStatus? _status;
+
+  @override
+  void initState() {
+    super.initState();
+    _refreshStatus();
+  }
+
+  Future<void> _refreshStatus() async {
+    final status = await Permission.manageExternalStorage.status;
+    if (!mounted) return;
+    setState(() => _status = status);
+  }
+
+  Future<void> _requestPermission() async {
+    final status = await Permission.manageExternalStorage.request();
+    if (!mounted) return;
+    setState(() => _status = status);
+    if (!status.isGranted) {
+      await openAppSettings();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final isGranted = _status?.isGranted == true;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    Widget step(String title, String body) {
+      return Container(
+        width: double.infinity,
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: isDark ? Colors.white10 : Colors.white.withValues(alpha: 0.96),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.14)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: AppFontWeights.emphasis,
+                color: cs.onSurface,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              body,
+              style: TextStyle(
+                fontSize: 13,
+                height: 1.38,
+                color: cs.onSurface.withValues(alpha: 0.68),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Scaffold(
+      appBar: AppBar(
+        leading: Tooltip(
+          message: AppLocalizations.of(context)!.mcpPageBackTooltip,
+          child: _TactileIconButton(
+            icon: Lucide.ArrowLeft,
+            color: cs.onSurface,
+            size: 22,
+            onTap: () => Navigator.of(context).maybePop(),
+          ),
+        ),
+        title: const Text('文件权限引导'),
+      ),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+        children: [
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: isGranted
+                  ? Colors.green.withValues(alpha: 0.12)
+                  : cs.primary.withValues(alpha: 0.10),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: (isGranted ? Colors.green : cs.primary).withValues(
+                  alpha: 0.28,
+                ),
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  isGranted ? Lucide.CheckCircle : Lucide.Folder,
+                  color: isGranted ? Colors.green : cs.primary,
+                  size: 22,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    isGranted
+                        ? '已获得所有文件访问权限，@kelivo/files 可以访问 /storage/emulated/0 下的大多数可见文件。'
+                        : 'Android 11+ 需要授予“所有文件访问权限”，@kelivo/files 才能稳定访问手机可见目录。',
+                    style: TextStyle(
+                      fontSize: 13,
+                      height: 1.35,
+                      color: cs.onSurface.withValues(alpha: 0.78),
+                      fontWeight: AppFontWeights.medium,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+          step(
+            '默认工作区',
+            '默认保持 phone_storage，也就是 /storage/emulated/0。除非你明确要求切换，否则文件工具不会改到其它工作区。',
+          ),
+          step('授权方式', '点击下方按钮后，在系统页面里找到 Kelivo，打开“允许管理所有文件”。不同系统文案可能略有差异。'),
+          step('能力边界', '这是共享存储权限，不是 root 权限。系统保护目录、其它 App 私有目录仍然不能随便访问。'),
+          const SizedBox(height: 6),
+          FilledButton.icon(
+            onPressed: _requestPermission,
+            icon: Icon(isGranted ? Lucide.RefreshCw : Lucide.Settings),
+            label: Text(isGranted ? '重新检查权限' : '打开权限设置'),
+          ),
+          const SizedBox(height: 10),
+          OutlinedButton.icon(
+            onPressed: _refreshStatus,
+            icon: const Icon(Lucide.RotateCw),
+            label: const Text('刷新状态'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LogPreviewBlock extends StatelessWidget {
+  const _LogPreviewBlock({required this.title, required this.text});
+
+  final String title;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: isDark ? Colors.black12 : const Color(0xFFF7F7F9),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.18)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 11,
+              color: cs.onSurface.withValues(alpha: 0.54),
+              fontWeight: AppFontWeights.emphasis,
+            ),
+          ),
+          const SizedBox(height: 4),
+          SelectableText(
+            text,
+            maxLines: 8,
+            style: TextStyle(
+              fontSize: 12,
+              height: 1.35,
+              color: cs.onSurface.withValues(alpha: 0.82),
+              fontFamily: 'monospace',
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

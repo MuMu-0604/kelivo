@@ -43,6 +43,7 @@ import '../../provider/pages/providers_page.dart';
 import '../../assistant/widgets/mcp_assistant_sheet.dart';
 import '../../quick_phrase/pages/quick_phrases_page.dart';
 import '../../quick_phrase/widgets/quick_phrase_menu.dart';
+import '../../skills/pages/skills_page.dart';
 import '../widgets/chat_input_bar.dart';
 import '../widgets/mini_map_sheet.dart';
 import '../widgets/instruction_injection_sheet.dart';
@@ -546,6 +547,14 @@ class _HomePageState extends State<HomePage>
     if (!mounted) return;
     final trimmed = text.trim();
     if (trimmed.isEmpty) return;
+    final parsed = _controller.parseSharedInput(trimmed);
+    final insertText = parsed.text;
+    if (parsed.imagePaths.isNotEmpty) {
+      _mediaController.addImages(parsed.imagePaths);
+    }
+    if (parsed.documents.isNotEmpty) {
+      _mediaController.addFiles(parsed.documents);
+    }
     final current = _inputController.text;
     final selection = _inputController.selection;
     final start = (selection.start >= 0 && selection.start <= current.length)
@@ -557,10 +566,12 @@ class _HomePageState extends State<HomePage>
             selection.end >= start)
         ? selection.end
         : start;
-    final next = current.replaceRange(start, end, trimmed);
+    final next = insertText.isEmpty
+        ? current
+        : current.replaceRange(start, end, insertText);
     _inputController.value = _inputController.value.copyWith(
       text: next,
-      selection: TextSelection.collapsed(offset: start + trimmed.length),
+      selection: TextSelection.collapsed(offset: start + insertText.length),
       composing: TextRange.empty,
     );
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -1241,6 +1252,7 @@ class _HomePageState extends State<HomePage>
           context,
         ).push(MaterialPageRoute(builder: (_) => const McpPage()));
       },
+      onOpenSkills: _openSkills,
       onOpenSearch: _openSearchSettings,
       onConfigureReasoning: () async {
         final assistantProvider = context.read<AssistantProvider>();
@@ -1514,6 +1526,12 @@ class _HomePageState extends State<HomePage>
     } else {
       await showWorldBookSheet(context, assistantId: assistantId);
     }
+  }
+
+  void _openSkills() {
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const SkillsPage()));
   }
 
   Future<void> _showLearningPromptSheet() async {

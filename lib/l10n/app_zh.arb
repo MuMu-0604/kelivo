@@ -1955,5 +1955,45 @@
         "type": "int"
       }
     }
-  }
+  },
+  "assistantEditPageSkillsTab": "技能",
+  "assistantEditSkillsEmptyMessage": "还没有安装技能。先导入一个技能文件吧。",
+  "assistantEditManageSkillsButton": "管理技能",
+  "skillsTitle": "技能",
+  "skillsImportTooltip": "导入技能",
+  "skillsAddTooltip": "添加技能",
+  "skillsEmptyMessage": "支持导入 Markdown、JSON、YAML、PDF、DOCX 或 ZIP 技能文件。",
+  "skillsImportButton": "导入技能",
+  "skillsDeleteAction": "删除",
+  "skillsImportFailed": "技能导入失败：{error}",
+  "@skillsImportFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "skillsNoValidImported": "没有导入有效的技能文件。",
+  "skillsImportedCount": "已导入 {count} 个技能。",
+  "@skillsImportedCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "skillsTriggersLine": "触发词：{keywords}",
+  "@skillsTriggersLine": {
+    "placeholders": {
+      "keywords": {
+        "type": "String"
+      }
+    }
+  },
+  "skillsSaveButton": "保存",
+  "skillsNameLabel": "名称",
+  "skillsDescriptionLabel": "描述",
+  "skillsTriggerKeywordsLabel": "触发关键词",
+  "skillsTriggerKeywordsHint": "代码审查、DCF、润色",
+  "skillsContentHint": "在这里粘贴技能指令。"
 }

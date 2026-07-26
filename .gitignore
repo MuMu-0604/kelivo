@@ -12,6 +12,15 @@
 .svn/
 .swiftpm/
 migrate_working_dir/
+WORKSPACE_CURRENT.md
+
+# Local build/runtime caches kept out of source control
+.android-build-cache/
+.gradle-home/
+.gradle-java-tmp/
+android-sdk-ascii/
+*.apk
+*.aab
 
 # IntelliJ related
 *.iml
@@ -33,6 +42,11 @@ migrate_working_dir/
 .pub-cache/
 .pub/
 /build/
+/android/.gradle/
+/android/.kotlin/
+/android/build/
+/android/local.properties
+/android/key.properties
 
 # Symbolication related
 app.*.symbols
@@ -45,7 +59,9 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
-pubspec.lock
+# Flutter application lockfile should be versioned. If it is currently untracked,
+# add it deliberately after dependency state is verified.
+!pubspec.lock
 /linux/flutter/generated_plugin_registrant.cc
 /windows/flutter/generated_plugin_registrant.cc
 /linux/flutter/generated_plugin_registrant.h

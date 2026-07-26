@@ -1,99 +1,167 @@
-<div align="center">
-  <img src="assets/app_icon.png" alt="Kelivo Icon" width="100" />
-  <h1>Kelivo</h1>
+# Kelivo Plus
 
-A Flutter LLM Chat Client
+[简体中文](README_ZH_CN.md) | English
 
-  <a href="https://discord.gg/Tb8DyvvV5T" target="_blank">
-    <img src="https://img.shields.io/badge/Join%20our%20Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Join Discord"/>
-  </a>
-  <a href="https://qm.qq.com/q/OQaXetKssC" target="_blank" style="margin-left: 6px;">
-    <img src="https://img.shields.io/badge/Join%20QQ%20Group-%230366CC?style=for-the-badge&logo=qq&logoColor=white" alt="Join QQ Group"/>
-  </a>
+Kelivo Plus is a modified open-source build based on [Chevey339/kelivo](https://github.com/Chevey339/kelivo). The original Kelivo is a cross-platform Flutter LLM chat client. This fork keeps the original chat, model provider, multimodal, MCP, search, and mobile/desktop foundations, then adds stronger mobile agent control, built-in tools, Skills, local hybrid search, and writable GitHub MCP tooling.
 
+> Fork notice: this repository is not the official upstream repository. It is a secondary development build based on the original Kelivo project. Original copyright, acknowledgements, and license terms are preserved. This project remains licensed under AGPL-3.0.
 
-English | [简体中文](README_ZH_CN.md)
-</div>
+## What Changed From Upstream
 
-<div align="center">
-  <img src="docx/screenshot_1.png" alt="Chat Screen" width="150" />
-  <img src="docx/screenshot_2.png" alt="Model Selection" width="150" />
-  <img src="docx/screenshot_3.png" alt="Tool Calling" width="150" />
-  <img src="docx/screenshot_4.png" alt="Web Search" width="150" />
-</div>
+| Area | Upstream Kelivo | Kelivo Plus |
+| --- | --- | --- |
+| Assistant configuration | Mostly manual settings pages | App Control Agent can import and edit configuration from chat after explicit assistant authorization |
+| Assistant permissions | Standard assistant settings | Adds an opt-in high-permission switch for app configuration control |
+| Skills | No standalone reusable Skills workflow | Adds Skill model, importer, Skills page, assistant binding, and trigger-based injection |
+| Built-in MCP | MCP integration with built-in Fetch | Adds built-in Files, Images, GitHub, and in-memory MCP services |
+| GitHub tools | Read-oriented or basic tooling | Adds grouped write-capable tools for repos, files, issues, PRs, releases, actions, secrets, and variables |
+| Search | Multiple API-backed providers | Adds API-key-free local hybrid search using Bing Local, DuckDuckGo, Baidu, Sogou, and 360 with filtering/ranking |
+| Mobile import flow | Mostly manual import | Supports chat-driven import from text, previous generated content, shared files, and user instructions |
+| Tool UX | Tool list can be noisy | Adds Chinese visible tool descriptions and grouped tool surfaces |
 
-## 🚀 Download
+## Highlights
 
-[![Download on the App Store](https://developer.apple.com/assets/elements/badges/download-on-the-app-store.svg)](https://apps.apple.com/us/app/kelivo/id6752122930)
+### App Control Agent
 
-🔗 [Download the latest version](https://github.com/Chevey339/kelivo/releases/latest)
+- Enable per assistant through the “Allow this assistant to control app configuration” switch.
+- Import user-provided instructions, pasted text, shared files, or newly generated content into app configuration targets.
+- Supported targets include assistant system prompts, memory, Skills, instruction injection, world books, MCP bindings, local tools, quick phrases, and search settings.
+- Recent changes can be undone.
+- Disabled by default and intended only for trusted assistants.
 
-🔗 [TestFlight](https://testflight.apple.com/join/erbGGykR) for beta testing.
+Example prompts:
 
-## 💖 Sponsors
+```text
+Import the content you just generated as a Skill, bind it to the current assistant, and use review/code-review as trigger keywords.
+```
 
-Thanks to [siliconflow.cn](https://siliconflow.cn) for providing free models in cooperation with us.
+```text
+Create a world book from this setting document and use character and location names as keywords.
+```
 
-## ✨ Features
+### Skills
 
-- 🎨 **Modern Design** - Material You design language with dynamic color theming support (Android 12+).
-- 🌙 **Dark Mode** - Perfectly adapted dark theme to protect your eyes.
-- 🌍 **Multi-language Support** - Supports both English and Chinese interfaces.
-- 🖥️ **Multi-platform Support** - Mobile (Android/iOS/Harmony) and Desktop (Windows/macOS/Linux).
-- 🔄 **Multi-provider Support** - Supports major AI providers like OpenAI, Google Gemini, Anthropic, etc.
-- 🤖 **Custom Assistants** - Create and manage personalized AI assistants.
-- 🖼️ **Multimodal Input** - Supports various formats including images, text documents, PDFs, Word documents, etc.
-- 📝 **Markdown Rendering** - Full support for code highlighting, LaTeX formulas, tables, and more.
-- 🎙️ **Voice/TTS Providers** - Built-in system TTS plus OpenAI / Google Gemini / ElevenLabs voice servers.
-- 🛠️ **MCP Support** - Model Context Protocol tool integration.
-- 🧰 **Built-in MCP Tools** - Includes a built-in MCP Fetch tool.
-- 🔍 **Web Search** - Integrated with multiple search engines (Bing, DuckDuckGo, Exa, Tavily, Zhipu, LinkUp, Brave, Metaso, SearXNG, Ollama, Jina, Perplexity, Bocha, Serper, Grok).
-- 🧩 **Prompt Variables** - Supports dynamic variables like model name, time, etc.
-- 📤 **QR Code Sharing** - Export and import provider configurations via QR codes.
-- 💾 **Data Backup** - Supports chat history backup and restoration.
-- 🌐 **Custom Requests** - Supports custom HTTP request headers and bodies.
-- 🔡 **Custom Fonts** - Bring your own fonts (system fonts / Google Fonts).
-- ⚙️ **Android Background Generation** - Keep chat generation running in the background (optional setting).
+- Create, edit, delete, and import reusable Skills.
+- Import Markdown, JSON, YAML, DOCX, and ZIP-based skill files.
+- Bind Skills to assistants or activate them with trigger keywords.
 
-## 📱 Platform Support
+### Built-In MCP Tools
 
-- ✅ Android
-- ✅ iOS
-- ✅ Harmony ([kelivo-ohos](https://github.com/Chevey339/kelivo-ohos))
-- ✅ Windows
-- ✅ macOS
-- ✅ Linux
+- `@kelivo/fetch`: fetch and extract web content.
+- `@kelivo/files`: local file read/write and directory operations.
+- `@kelivo/images`: image-oriented helper tools.
+- `@kelivo/github`: GitHub repository, file, issue, PR, release, Actions, secrets, and variables operations.
 
-## 🤝 Contribution Guide
+### GitHub Write Tools
 
-Pull Requests and Issues are welcome!
+The GitHub MCP server exposes grouped tools instead of one tool per API endpoint:
 
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
+- Repository and file operations.
+- Branch, tag, commit, directory, and file management.
+- Issue and pull request workflows.
+- Pull request merge and review comments, including inline and file-level comments.
+- Release management.
+- GitHub Actions workflow/run/job/log operations.
+- Repository/environment secrets and variables.
 
-## ❤️ Acknowledgements
+The wrapper layer also follows GitHub API constraints more strictly: empty repositories are initialized before branch creation, reserved `GITHUB_` variable names are rejected early, fresh writes are verified with strong read APIs instead of code search, PR updates use minimal payloads, and review-comment creation is separated from reply-comment payloads.
 
-Special thanks to the [RikkaHub](https://github.com/re-ovo/rikkahub) project for the UI design inspiration. Kelivo's interface design is heavily inspired by RikkaHub's beautiful and practical design.
+### Local Hybrid Search
 
-## ⭐ Star History
+- API-key-free local search mode.
+- Aggregates Bing Local, DuckDuckGo, Baidu, Sogou, and 360.
+- Isolates provider failures, deduplicates URLs, removes low-value results, and ranks by provider/source quality.
 
-If you like this project, please give it a star ⭐
+## Usage
 
-[![Star History Chart](https://api.star-history.com/svg?repos=Chevey339/kelivo&type=Date)](https://star-history.com/#Chevey339/kelivo&Date)
+### Install Android APK
 
-## 📄 License
+Download the latest APK from GitHub Releases. The public APK keeps the Android package name `com.psyche.kelivo`, the same as upstream Kelivo, so Android treats it as the same app:
 
-This project is licensed under the AGPL-3.0 License - see the [LICENSE](LICENSE) file for details.
+- It cannot be installed over the official upstream Kelivo app unless the signing certificate matches, which it normally does not.
+- It cannot coexist with upstream Kelivo because Android only allows one installed app per package name.
+- It can update an older Kelivo Plus build only when the signing certificate is the same and the version code is not lower.
 
-## 📞 Contact Us
+Recommended installation path:
 
-- Issue: [GitHub Issues](https://github.com/Chevey339/kelivo/issues)
+1. Back up or export data from upstream Kelivo if needed.
+2. Uninstall upstream Kelivo.
+3. Install the Kelivo Plus APK from Releases.
+4. Import backups or reconfigure providers, assistants, MCP, and GitHub Token.
 
----
+To coexist with upstream Kelivo, build a separate package-name variant:
 
-<div align="center">
-Made with ❤️ using Flutter
-</div>
+1. Change Android `applicationId`, for example to `com.psyche.kelivo.plus`.
+2. Optionally change the app label to `Kelivo Plus` to avoid launcher confusion.
+3. Sign the APK with your own key.
+4. Treat it as a separate app with separate app data; migrate data through backup/import rather than direct private-data sharing.
+
+The current Release APK is a same-package build, not a coexistence build.
+
+### Configure Models
+
+1. Open Kelivo Plus.
+2. Add a model provider such as OpenAI, Gemini, Anthropic, or another compatible endpoint.
+3. Select the model in chat and start using it.
+
+### Enable App Control Agent
+
+1. Open an assistant settings page.
+2. Enable “Allow this assistant to control app configuration”.
+3. Ask the assistant to import or edit a supported configuration target from chat.
+4. Review the generated action and undo recent changes when needed.
+
+### Configure GitHub Token
+
+1. Open the MCP page.
+2. Edit the built-in GitHub MCP server.
+3. Paste a GitHub token into the GitHub Token field.
+4. Grant only the scopes you need, commonly `repo` and `workflow` for write workflows.
+
+### Use Local Hybrid Search
+
+1. Open Search service settings.
+2. Enable Local Hybrid Search.
+3. No API key is required.
+
+## Build From Source
+
+Recommended environment:
+
+- Flutter 3.44.1 or newer
+- Dart 3.12.1 or newer
+- Android SDK/NDK for Android builds
+
+Common commands:
+
+```powershell
+flutter pub get
+flutter test test/core/providers/mcp_provider_builtin_test.dart test/kelivo_github_mcp_server_test.dart
+flutter build apk --release --target-platform android-arm64
+```
+
+The repository does not include signing secrets. Configure your own `android/key.properties` or Android signing workflow before publishing APKs.
+
+## Security Notes
+
+- App Control Agent is a high-permission capability and is disabled by default.
+- GitHub write tools can modify remote repositories; use least-privilege tokens.
+- Do not commit tokens, secrets, keystores, `android/key.properties`, build caches, or APK outputs.
+- AGPL-3.0 obligations apply when distributing modified builds.
+
+## Documentation
+
+- [Chinese README](README_ZH_CN.md)
+- [Kelivo Plus change notes](docs/KELIVO_PLUS_CHANGES_ZH.md)
+- [Android installation and coexistence guide](docs/ANDROID_INSTALLATION_ZH.md)
+- [Release notes](docs/RELEASE_NOTES_1.1.17_PLUS.md)
+- [Search upgrade notes](docs/KELIVO_SEARCH_UPGRADE_NOTES.md)
+
+## Acknowledgements
+
+- Original project: [Chevey339/kelivo](https://github.com/Chevey339/kelivo)
+- UI inspiration: [RikkaHub](https://github.com/re-ovo/rikkahub)
+
+## License
+
+Kelivo Plus is licensed under AGPL-3.0. See [LICENSE](LICENSE) for details.

@@ -57,6 +57,7 @@ class ChatInputBar extends StatefulWidget {
     this.onSelectModel,
     this.onLongPressSelectModel,
     this.onOpenMcp,
+    this.onOpenSkills,
     this.onLongPressMcp,
     this.onOpenSearch,
     this.onMore,
@@ -75,6 +76,7 @@ class ChatInputBar extends StatefulWidget {
     this.supportsReasoning = true,
     this.showMcpButton = false,
     this.mcpActive = false,
+    this.skillsActive = false,
     this.showMiniMapButton = false,
     this.onOpenMiniMap,
     this.onPickCamera,
@@ -108,6 +110,7 @@ class ChatInputBar extends StatefulWidget {
   final VoidCallback? onSelectModel;
   final VoidCallback? onLongPressSelectModel;
   final VoidCallback? onOpenMcp;
+  final VoidCallback? onOpenSkills;
   final VoidCallback? onLongPressMcp;
   final VoidCallback? onOpenSearch;
   final VoidCallback? onMore;
@@ -126,6 +129,7 @@ class ChatInputBar extends StatefulWidget {
   final bool supportsReasoning;
   final bool showMcpButton;
   final bool mcpActive;
+  final bool skillsActive;
   final bool showMiniMapButton;
   final VoidCallback? onOpenMiniMap;
   final VoidCallback? onPickCamera;
@@ -1116,6 +1120,25 @@ class _ChatInputBarState extends State<ChatInputBar>
                 icon: Lucide.Hammer,
                 label: l10n.chatInputBarMcpServersTooltip,
                 onTap: lockTap(widget.onOpenMcp),
+              ),
+            ),
+          );
+        }
+
+        if (widget.onOpenSkills != null) {
+          actions.add(
+            _OverflowAction(
+              width: normalButtonW,
+              builder: () => _CompactIconButton(
+                tooltip: l10n.skillsTitle,
+                icon: Lucide.Sparkles,
+                active: widget.skillsActive,
+                onTap: lockTap(widget.onOpenSkills),
+              ),
+              menu: DesktopContextMenuItem(
+                icon: Lucide.Sparkles,
+                label: l10n.skillsTitle,
+                onTap: lockTap(widget.onOpenSkills),
               ),
             ),
           );

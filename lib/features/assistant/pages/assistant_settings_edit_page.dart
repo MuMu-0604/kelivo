@@ -27,15 +27,18 @@ import '../../../core/models/chat_message.dart';
 import '../../../core/models/conversation.dart';
 import '../../../core/models/preset_message.dart';
 import '../../../core/models/quick_phrase.dart';
+import '../../../core/models/skill.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/mcp_provider.dart';
 import '../../../core/providers/quick_phrase_provider.dart';
+import '../../../core/providers/skill_provider.dart';
 import '../../../core/providers/memory_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/haptics.dart';
 import '../../../desktop/desktop_context_menu.dart';
 import '../../home/services/local_tools_service.dart';
+import '../../skills/pages/skills_page.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/emoji_picker_dialog.dart';
@@ -57,6 +60,7 @@ part 'assistant_settings_edit_memory_tab.dart';
 part 'assistant_settings_edit_local_tools_tab.dart';
 part 'assistant_settings_edit_mcp_tab.dart';
 part 'assistant_settings_edit_quick_phrase_tab.dart';
+part 'assistant_settings_edit_skills_tab.dart';
 part 'assistant_settings_edit_custom_request_tab.dart';
 
 const int _contextMessageMin = Assistant.minContextMessageSize;
@@ -117,6 +121,12 @@ List<_AssistantEditTabSpec> _assistantEditTabSpecs(
       label: l10n.assistantEditPageQuickPhraseTab,
       icon: Lucide.Zap,
       child: _QuickPhraseTab(assistantId: assistantId),
+    ),
+    _AssistantEditTabSpec(
+      id: assistantEditTabSkills,
+      label: l10n.assistantEditPageSkillsTab,
+      icon: Lucide.Sparkles,
+      child: _SkillsTab(assistantId: assistantId),
     ),
     _AssistantEditTabSpec(
       id: assistantEditTabCustom,

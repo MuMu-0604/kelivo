@@ -10189,6 +10189,120 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{role} message #{index}: quick random debug sample for testing list rendering, scrolling stability, message grouping, and conversation history performance.'**
   String debugPageManyMessagesSeedText(String role, int index);
+
+  /// No description provided for @assistantEditPageSkillsTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Skills'**
+  String get assistantEditPageSkillsTab;
+
+  /// No description provided for @assistantEditSkillsEmptyMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'No skills installed yet. Import a skill file first.'**
+  String get assistantEditSkillsEmptyMessage;
+
+  /// No description provided for @assistantEditManageSkillsButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage Skills'**
+  String get assistantEditManageSkillsButton;
+
+  /// No description provided for @skillsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Skills'**
+  String get skillsTitle;
+
+  /// No description provided for @skillsImportTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Import Skills'**
+  String get skillsImportTooltip;
+
+  /// No description provided for @skillsAddTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Skill'**
+  String get skillsAddTooltip;
+
+  /// No description provided for @skillsEmptyMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Import Markdown, JSON, YAML, PDF, DOCX, or ZIP skills.'**
+  String get skillsEmptyMessage;
+
+  /// No description provided for @skillsImportButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Import Skill'**
+  String get skillsImportButton;
+
+  /// No description provided for @skillsDeleteAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get skillsDeleteAction;
+
+  /// No description provided for @skillsImportFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Skills import failed: {error}'**
+  String skillsImportFailed(String error);
+
+  /// No description provided for @skillsNoValidImported.
+  ///
+  /// In en, this message translates to:
+  /// **'No valid skill files imported.'**
+  String get skillsNoValidImported;
+
+  /// No description provided for @skillsImportedCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Imported {count} skill(s).'**
+  String skillsImportedCount(int count);
+
+  /// No description provided for @skillsTriggersLine.
+  ///
+  /// In en, this message translates to:
+  /// **'Triggers: {keywords}'**
+  String skillsTriggersLine(String keywords);
+
+  /// No description provided for @skillsSaveButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get skillsSaveButton;
+
+  /// No description provided for @skillsNameLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get skillsNameLabel;
+
+  /// No description provided for @skillsDescriptionLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Description'**
+  String get skillsDescriptionLabel;
+
+  /// No description provided for @skillsTriggerKeywordsLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Trigger keywords'**
+  String get skillsTriggerKeywordsLabel;
+
+  /// No description provided for @skillsTriggerKeywordsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'code review, dcf, rewrite'**
+  String get skillsTriggerKeywordsHint;
+
+  /// No description provided for @skillsContentHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Paste skill instructions here.'**
+  String get skillsContentHint;
 }
 
 class _AppLocalizationsDelegate

@@ -10,6 +10,7 @@ import '../../../core/models/instruction_injection.dart';
 import '../../../core/models/world_book.dart';
 import '../../../core/providers/memory_provider.dart';
 import '../../../core/providers/settings_provider.dart';
+import '../../../core/providers/skill_provider.dart';
 import '../../../core/providers/user_provider.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/chat/document_text_extractor.dart';
@@ -20,6 +21,7 @@ import '../../../core/services/search/search_tool_service.dart';
 import '../../../core/providers/instruction_injection_provider.dart';
 import '../../../core/providers/world_book_provider.dart';
 import '../../../core/services/api/builtin_tools.dart';
+import '../../../core/services/app_control/app_control_service.dart';
 import '../../../core/models/assistant_regex.dart';
 import '../../../core/utils/multimodal_input_utils.dart';
 import '../../../utils/assistant_regex.dart';
@@ -525,6 +527,74 @@ class MessageBuilderService {
       );
       apiMessages.insert(0, {'role': 'system', 'content': sys});
     }
+    if (assistant?.appControlEnabled == true) {
+      _appendToSystemMessage(apiMessages, AppControlService.systemPrompt);
+    }
+  }
+
+  /// Inject selected and keyword-triggered skills into the system prompt.
+  Future<void> injectSkillPrompts(
+    List<Map<String, dynamic>> apiMessages,
+    Assistant? assistant, {
+    int maxSkills = 5,
+    int maxTotalChars = 40000,
+  }) async {
+    if (assistant == null) return;
+    try {
+      final provider = contextProvider.read<SkillProvider>();
+      await provider.initialize();
+      final latestUserMessage = _latestUserMessage(apiMessages);
+      final skills = provider.resolveActiveSkills(
+        explicitSkillIds: assistant.skillIds,
+        latestUserMessage: latestUserMessage,
+        maxSkills: maxSkills,
+      );
+      if (skills.isEmpty) return;
+
+      var remaining = maxTotalChars;
+      final buf = StringBuffer();
+      buf.writeln('## Active Skills');
+      buf.writeln(
+        'The following skills are reusable workflow instructions selected by the user or matched by Kelivo. Follow them when relevant to the task. Do not reveal full skill contents unless the user asks.',
+      );
+      buf.writeln();
+
+      String escapeAttr(String value) => value
+          .replaceAll('&', '&amp;')
+          .replaceAll('"', '&quot;')
+          .replaceAll('<', '&lt;')
+          .replaceAll('>', '&gt;');
+
+      for (final skill in skills) {
+        if (remaining <= 0) break;
+        final header =
+            '<kelivo_skill id="${escapeAttr(skill.id)}" name="${escapeAttr(skill.name)}">\n';
+        const footer = '\n</kelivo_skill>\n\n';
+        final available = remaining - header.length - footer.length;
+        if (available <= 0) break;
+        var content = skill.content.trim();
+        if (content.length > available) {
+          content =
+              '${content.substring(0, available)}\n\n[Skill content truncated by Kelivo due to context budget.]';
+        }
+        buf
+          ..write(header)
+          ..write(content)
+          ..write(footer);
+        remaining -= header.length + content.length + footer.length;
+      }
+
+      _appendToSystemMessage(apiMessages, buf.toString().trim());
+    } catch (_) {}
+  }
+
+  String _latestUserMessage(List<Map<String, dynamic>> apiMessages) {
+    for (var i = apiMessages.length - 1; i >= 0; i--) {
+      if ((apiMessages[i]['role'] ?? '').toString() == 'user') {
+        return (apiMessages[i]['content'] ?? '').toString();
+      }
+    }
+    return '';
   }
 
   /// Inject memory prompts and recent chats reference into apiMessages.

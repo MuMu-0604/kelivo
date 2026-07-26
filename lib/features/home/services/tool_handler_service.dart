@@ -10,6 +10,7 @@ import '../../../core/providers/memory_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/tts_provider.dart';
 import '../../../core/services/api/chat_api_service.dart';
+import '../../../core/services/app_control/app_control_service.dart';
 import '../../../core/services/mcp/mcp_tool_service.dart';
 import '../../../core/services/search/search_tool_service.dart';
 import 'ask_user_interaction_service.dart';
@@ -188,6 +189,11 @@ class ToolHandlerService {
       toolDefs.addAll(_buildMemoryToolDefinitions());
     }
 
+    // App Control tools
+    if (assistant?.appControlEnabled == true && supportsTools) {
+      toolDefs.add(AppControlService.getToolDefinition());
+    }
+
     // Local tools
     toolDefs.addAll(
       LocalToolsService.buildToolDefinitions(
@@ -348,6 +354,9 @@ class ToolHandlerService {
     // Capture AssistantProvider reference before async gap to avoid
     // use_build_context_synchronously warning
     final assistantProvider = contextProvider.read<AssistantProvider>();
+    final appControlService = AppControlService(
+      contextProvider: contextProvider,
+    );
 
     return (name, args, {toolCallId}) async {
       try {
@@ -362,6 +371,40 @@ class ToolHandlerService {
         final memoryResult = await _handleMemoryToolCall(name, args, assistant);
         if (memoryResult != null) {
           return memoryResult;
+        }
+
+        // App Control tool
+        if (name == AppControlToolNames.appControl) {
+          if (assistant?.appControlEnabled != true) {
+            return _toolError(
+              error: 'permission_required',
+              message:
+                  'Current assistant has not been granted App Control permission.',
+              tool: name,
+            );
+          }
+          final action = (args['action'] ?? '').toString();
+          final needsApproval =
+              action == AppControlActionNames.executeAction ||
+              action == AppControlActionNames.undoLast;
+          if (needsApproval && approvalService != null) {
+            final approvalToolCallId = toolCallId?.trim().isNotEmpty == true
+                ? toolCallId!.trim()
+                : '${name}_${DateTime.now().microsecondsSinceEpoch}';
+            final result = await approvalService.requestApproval(
+              toolCallId: approvalToolCallId,
+              toolName: name,
+              arguments: args,
+            );
+            if (!result.approved) {
+              return _toolError(
+                error: 'approval_denied',
+                message: result.denyReason ?? 'User denied the tool call',
+                tool: name,
+              );
+            }
+          }
+          return appControlService.handleToolCall(args, assistant);
         }
 
         // Local tools
@@ -421,10 +464,11 @@ class ToolHandlerService {
 
         // Approval gate for MCP tools
         if (approvalService != null && mcp.toolNeedsApproval(name)) {
-          // Generate a unique id for this tool call approval request
-          final toolCallId = '${name}_${DateTime.now().microsecondsSinceEpoch}';
+          final approvalToolCallId = toolCallId?.trim().isNotEmpty == true
+              ? toolCallId!.trim()
+              : '${name}_${DateTime.now().microsecondsSinceEpoch}';
           final result = await approvalService.requestApproval(
-            toolCallId: toolCallId,
+            toolCallId: approvalToolCallId,
             toolName: name,
             arguments: args,
           );

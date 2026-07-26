@@ -53,9 +53,11 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
 
   bool _enabled = true;
   final _nameCtrl = TextEditingController();
+  final _githubTokenCtrl = TextEditingController();
   McpTransportType _transport = McpTransportType.http;
   final _urlCtrl = TextEditingController();
   final List<_HeaderEntry> _headers = [];
+  bool _githubTokenObscured = true;
 
   @override
   void initState() {
@@ -66,6 +68,9 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
       final server = context.read<McpProvider>().getById(widget.serverId!)!;
       _enabled = server.enabled;
       _nameCtrl.text = server.name;
+      if (context.read<McpProvider>().isBuiltinGithubServer(server)) {
+        _githubTokenCtrl.text = context.read<McpProvider>().githubToken;
+      }
       _transport = server.transport;
       _urlCtrl.text = server.url;
       server.headers.forEach((k, v) {
@@ -88,6 +93,7 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
     _tab?.removeListener(_onTabChanged);
     _tab?.dispose();
     _nameCtrl.dispose();
+    _githubTokenCtrl.dispose();
     _urlCtrl.dispose();
     for (final h in _headers) {
       h.dispose();
@@ -150,6 +156,8 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
     required String label,
     required TextEditingController controller,
     String? hint,
+    bool obscureText = false,
+    Widget? suffixIcon,
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final cs = Theme.of(context).colorScheme;
@@ -166,6 +174,9 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
         const SizedBox(height: 6),
         TextField(
           controller: controller,
+          obscureText: obscureText,
+          enableSuggestions: !obscureText,
+          autocorrect: !obscureText,
           decoration: InputDecoration(
             hintText: hint,
             filled: true,
@@ -192,6 +203,7 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
               horizontal: 12,
               vertical: 12,
             ),
+            suffixIcon: suffixIcon,
           ),
         ),
       ],
@@ -216,6 +228,12 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
     final isBuiltin = isEdit && _transport == McpTransportType.inmemory;
+    final server = isEdit
+        ? context.read<McpProvider>().getById(widget.serverId!)
+        : null;
+    final isBuiltinGithub =
+        server != null &&
+        context.read<McpProvider>().isBuiltinGithubServer(server);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -253,6 +271,81 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
                   ],
                 ),
               ),
+              if (isBuiltinGithub)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Lucide.KeyRound, size: 16, color: cs.primary),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'GitHub Token',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: AppFontWeights.medium,
+                              ),
+                            ),
+                          ),
+                          Text(
+                            context.read<McpProvider>().hasGithubToken
+                                ? '已配置'
+                                : '未配置',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: context.read<McpProvider>().hasGithubToken
+                                  ? Colors.green
+                                  : cs.onSurface.withValues(alpha: 0.55),
+                              fontWeight: AppFontWeights.medium,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      _inputRow(
+                        label: '访问令牌',
+                        controller: _githubTokenCtrl,
+                        hint: 'ghp_... / github_pat_...',
+                        obscureText: _githubTokenObscured,
+                        suffixIcon: IconButton(
+                          tooltip: _githubTokenObscured
+                              ? '显示 Token'
+                              : '隐藏 Token',
+                          icon: Icon(
+                            _githubTokenObscured ? Lucide.Eye : Lucide.EyeOff,
+                            size: 18,
+                          ),
+                          onPressed: () => setState(
+                            () => _githubTokenObscured = !_githubTokenObscured,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              '用于 @kelivo/github 请求认证；留空保存会清除 Token。',
+                              style: TextStyle(
+                                fontSize: 12,
+                                height: 1.35,
+                                color: cs.onSurface.withValues(alpha: 0.58),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          TextButton(
+                            onPressed: () => setState(_githubTokenCtrl.clear),
+                            child: const Text('清除'),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
             ],
           )
         else ...[
@@ -370,6 +463,9 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
     if (isEdit && _transport == McpTransportType.inmemory) {
       final old = mcp.getById(widget.serverId!)!;
       await mcp.updateServer(old.copyWith(enabled: _enabled));
+      if (mcp.isBuiltinGithubServer(old)) {
+        await mcp.updateGithubToken(_githubTokenCtrl.text);
+      }
       if (mounted) Navigator.of(context).pop();
       return;
     }

@@ -426,6 +426,11 @@ class _SearchServicesPageState extends State<SearchServicesPage> {
     final l10n = AppLocalizations.of(context)!;
     final testing = _testing[s.id] == true;
     final conn = context.watch<SettingsProvider>().searchConnection[s.id];
+    final localScraper =
+        s is BingLocalOptions ||
+        s is BaiduLocalOptions ||
+        s is SogouLocalOptions ||
+        s is So360LocalOptions;
     String statusText;
     Color statusBg;
     Color statusFg;
@@ -486,7 +491,7 @@ class _SearchServicesPageState extends State<SearchServicesPage> {
                         ),
                       ),
                     ),
-                    if (s is! BingLocalOptions && statusText.isNotEmpty) ...[
+                    if (!localScraper && statusText.isNotEmpty) ...[
                       const SizedBox(width: 8),
                       Container(
                         padding: const EdgeInsets.symmetric(
@@ -572,6 +577,7 @@ class _BrandBadge extends StatelessWidget {
   }
 
   static String _nameForService(SearchServiceOptions s) {
+    if (s is HybridLocalSearchOptions) return 'hybrid local';
     if (s is BingLocalOptions) return 'bing';
     if (s is DuckDuckGoOptions) return 'duckduckgo';
     if (s is TavilyOptions) return 'tavily';
@@ -746,6 +752,7 @@ class _AddServiceBottomSheetState extends State<_AddServiceBottomSheet> {
   Widget _buildServiceTypeList() {
     final l10n = AppLocalizations.of(context)!;
     final services = [
+      {'type': 'hybrid_local', 'name': 'Local Hybrid Search'},
       {'type': 'bing_local', 'name': l10n.searchServiceNameBingLocal},
       {'type': 'duckduckgo', 'name': l10n.searchServiceNameDuckDuckGo},
       {'type': 'tavily', 'name': l10n.searchServiceNameTavily},
@@ -796,6 +803,8 @@ class _AddServiceBottomSheetState extends State<_AddServiceBottomSheet> {
   String _getServiceName(String type) {
     final l10n = AppLocalizations.of(context)!;
     switch (type) {
+      case 'hybrid_local':
+        return 'Local Hybrid Search';
       case 'bing_local':
         return l10n.searchServiceNameBingLocal;
       case 'duckduckgo':
@@ -926,6 +935,7 @@ class _AddServiceBottomSheetState extends State<_AddServiceBottomSheet> {
     }
 
     switch (type) {
+      case 'hybrid_local':
       case 'bing_local':
         return [
           Container(
@@ -942,7 +952,7 @@ class _AddServiceBottomSheetState extends State<_AddServiceBottomSheet> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    l10n.searchServiceNameBingLocal,
+                    _getServiceName(type),
                     style: TextStyle(
                       fontSize: 14,
                       color: cs.onSurface.withValues(alpha: 0.8),
@@ -1191,6 +1201,8 @@ class _AddServiceBottomSheetState extends State<_AddServiceBottomSheet> {
     final id = uuid.v4().substring(0, 8);
 
     switch (_selectedType) {
+      case 'hybrid_local':
+        return HybridLocalSearchOptions(id: id);
       case 'bing_local':
         return BingLocalOptions(id: id);
       case 'duckduckgo':
@@ -1496,7 +1508,7 @@ class _EditServiceSheetState extends State<_EditServiceSheet> {
       );
     }
 
-    if (service is BingLocalOptions) {
+    if (service is HybridLocalSearchOptions || service is BingLocalOptions) {
       return [Text(l10n.searchServicesEditDialogBingLocalNoConfig)];
     } else if (service is DuckDuckGoOptions) {
       return [
@@ -1896,6 +1908,8 @@ class _ServiceIcon extends StatelessWidget {
   // Map service type to name for BrandAssets matching
   String _getMatchName(String type) {
     switch (type) {
+      case 'hybrid_local':
+        return 'hybrid local';
       case 'bing_local':
         return 'bing';
       case 'tavily':

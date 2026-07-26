@@ -658,6 +658,33 @@ class HomePageController extends ChangeNotifier {
     await sendMessage(ChatInputData(text: text));
   }
 
+  ChatInputData parseSharedInput(String raw) {
+    final parsed = _messageBuilderService.parseInputFromRaw(raw);
+    final images = <String>[];
+    final docs = <DocumentAttachment>[];
+    for (final doc in parsed.documents) {
+      final mime = _fileUploadService.inferMimeByExtension(doc.fileName);
+      final effectiveMime = doc.mime.trim().isNotEmpty ? doc.mime.trim() : mime;
+      if (_fileUploadService.isImageExtension(doc.fileName) ||
+          effectiveMime.toLowerCase().startsWith('image/')) {
+        images.add(doc.path);
+      } else {
+        docs.add(
+          DocumentAttachment(
+            path: doc.path,
+            fileName: doc.fileName,
+            mime: effectiveMime,
+          ),
+        );
+      }
+    }
+    return ChatInputData(
+      text: parsed.text,
+      imagePaths: [...parsed.imagePaths, ...images],
+      documents: docs,
+    );
+  }
+
   void _replaceInputWithSuggestion(String text) {
     _inputController.value = TextEditingValue(
       text: text,

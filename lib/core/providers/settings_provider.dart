@@ -1168,11 +1168,18 @@ class SettingsProvider extends ChangeNotifier {
     if (searchServicesStr != null && searchServicesStr.isNotEmpty) {
       try {
         final list = jsonDecode(searchServicesStr) as List;
-        _searchServices = list
+        final loadedServices = list
             .map(
               (e) => SearchServiceOptions.fromJson(e as Map<String, dynamic>),
             )
             .toList();
+        final loadedSelected = prefs.getInt(_searchSelectedKey) ?? 0;
+        final normalized = _normalizeSearchServiceState(
+          loadedServices,
+          loadedSelected,
+        );
+        _searchServices = normalized.services;
+        _searchServiceSelected = normalized.selectedIndex;
       } catch (_) {}
     }
     final searchCommonStr = prefs.getString(_searchCommonKey);
@@ -1183,7 +1190,9 @@ class SettingsProvider extends ChangeNotifier {
         );
       } catch (_) {}
     }
-    _searchServiceSelected = prefs.getInt(_searchSelectedKey) ?? 0;
+    if (searchServicesStr == null || searchServicesStr.isEmpty) {
+      _searchServiceSelected = prefs.getInt(_searchSelectedKey) ?? 0;
+    }
     _searchEnabled = prefs.getBool(_searchEnabledKey) ?? false;
     _searchAutoTestOnLaunch =
         prefs.getBool(_searchAutoTestOnLaunchKey) ?? false;
@@ -1881,11 +1890,16 @@ class SettingsProvider extends ChangeNotifier {
   }
 
   Future<void> _initSearchConnectivityTests() async {
-    final services = List<SearchServiceOptions>.from(_searchServices);
+    final services = List<SearchServiceOptions>.from(
+      _normalizeSearchServiceState(
+        _searchServices,
+        _searchServiceSelected,
+      ).services,
+    );
     final common = _searchCommonOptions;
     for (final s in services) {
-      if (s is BingLocalOptions) {
-        _searchConnection[s.id] = null; // no label for local Bing
+      if (s is HybridLocalSearchOptions || s is BingLocalOptions) {
+        _searchConnection[s.id] = null; // no label for local HTML search
         continue;
       }
       // Run in background; don't await all
@@ -4111,7 +4125,12 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
 
   // Search service settings
   Future<void> setSearchServices(List<SearchServiceOptions> services) async {
-    _searchServices = List.from(services);
+    final normalized = _normalizeSearchServiceState(
+      services,
+      _searchServiceSelected,
+    );
+    _searchServices = normalized.services;
+    _searchServiceSelected = normalized.selectedIndex;
     if (_searchServiceSelected >= _searchServices.length) {
       _searchServiceSelected = _searchServices.isNotEmpty
           ? _searchServices.length - 1
@@ -4141,6 +4160,42 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(_searchSelectedKey, _searchServiceSelected);
+  }
+
+  ({List<SearchServiceOptions> services, int selectedIndex})
+  _normalizeSearchServiceState(
+    List<SearchServiceOptions> services,
+    int selectedIndex,
+  ) {
+    final out = <SearchServiceOptions>[];
+    var hasHybrid = false;
+    var hadStandaloneChinese = false;
+    var selectedWasStandaloneChinese = false;
+    var shiftedSelectedIndex = selectedIndex;
+    for (final service in services) {
+      if (service is BaiduLocalOptions ||
+          service is SogouLocalOptions ||
+          service is So360LocalOptions) {
+        hadStandaloneChinese = true;
+        final originalIndex = services.indexOf(service);
+        if (originalIndex == selectedIndex) selectedWasStandaloneChinese = true;
+        if (originalIndex < selectedIndex) shiftedSelectedIndex--;
+        continue;
+      }
+      if (service is HybridLocalSearchOptions) hasHybrid = true;
+      out.add(service);
+    }
+    if (!hasHybrid && (out.isEmpty || hadStandaloneChinese)) {
+      out.insert(0, HybridLocalSearchOptions(id: 'hybrid-local'));
+      if (selectedWasStandaloneChinese) {
+        shiftedSelectedIndex = 0;
+      } else {
+        shiftedSelectedIndex++;
+      }
+    }
+    if (out.isEmpty) out.add(SearchServiceOptions.defaultOption);
+    final safeIndex = shiftedSelectedIndex.clamp(0, out.length - 1);
+    return (services: out, selectedIndex: safeIndex);
   }
 
   Future<void> setSearchEnabled(bool enabled) async {

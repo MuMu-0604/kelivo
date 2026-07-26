@@ -7,6 +7,8 @@ import 'package:html/dom.dart' as dom;
 import 'package:html2md/html2md.dart' as html2md;
 import 'package:mcp_client/mcp_client.dart' as mcp;
 
+import '../in_memory_mcp_server.dart';
+
 /// @kelivo/fetch — In-memory MCP server engine and transport (Flutter/Dart)
 ///
 /// Provides four tools:
@@ -145,9 +147,10 @@ class KelivoFetcher {
 }
 
 /// Minimal JSON-RPC server for MCP that serves @kelivo/fetch tools.
-class KelivoFetchMcpServerEngine {
+class KelivoFetchMcpServerEngine implements KelivoInMemoryMcpServerEngine {
   bool _closed = false;
 
+  @override
   Future<dynamic> handleMessage(dynamic message) async {
     if (_closed) return null;
 
@@ -230,6 +233,7 @@ class KelivoFetchMcpServerEngine {
     }
   }
 
+  @override
   void close() {
     _closed = true;
   }
@@ -256,11 +260,8 @@ class KelivoFetchMcpServerEngine {
     Map<String, dynamic> schema() => {
       'type': 'object',
       'properties': {
-        'url': {'type': 'string', 'description': 'URL of the website to fetch'},
-        'headers': {
-          'type': 'object',
-          'description': 'Optional headers to include in the request',
-        },
+        'url': {'type': 'string', 'description': '要获取内容的网站 URL。'},
+        'headers': {'type': 'object', 'description': '请求中可选附加的 HTTP 头。'},
       },
       'required': ['url'],
     };
@@ -268,23 +269,22 @@ class KelivoFetchMcpServerEngine {
     return [
       {
         'name': 'fetch_html',
-        'description': 'Fetch a website and return the content as HTML',
+        'description': '获取网页并以 HTML 形式返回内容。',
         'inputSchema': schema(),
       },
       {
         'name': 'fetch_markdown',
-        'description': 'Fetch a website and return the content as Markdown',
+        'description': '获取网页并将内容转换为 Markdown 返回。',
         'inputSchema': schema(),
       },
       {
         'name': 'fetch_txt',
-        'description':
-            'Fetch a website, return the content as plain text (no HTML)',
+        'description': '获取网页并以纯文本返回内容，不包含 HTML 标记。',
         'inputSchema': schema(),
       },
       {
         'name': 'fetch_json',
-        'description': 'Fetch a JSON file from a URL',
+        'description': '从 URL 获取 JSON 文件。',
         'inputSchema': schema(),
       },
     ];
@@ -293,7 +293,7 @@ class KelivoFetchMcpServerEngine {
 
 /// In-memory ClientTransport that directly invokes the local server engine.
 class KelivoInMemoryClientTransport implements mcp.ClientTransport {
-  final KelivoFetchMcpServerEngine _server;
+  final KelivoInMemoryMcpServerEngine _server;
   final _messageController = StreamController<dynamic>.broadcast();
   final _closeCompleter = Completer<void>();
   bool _closed = false;

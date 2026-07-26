@@ -24,6 +24,7 @@ import 'core/providers/assistant_provider.dart';
 import 'core/providers/tag_provider.dart';
 import 'core/providers/update_provider.dart';
 import 'core/providers/quick_phrase_provider.dart';
+import 'core/providers/skill_provider.dart';
 import 'core/providers/instruction_injection_provider.dart';
 import 'core/providers/instruction_injection_group_provider.dart';
 import 'core/providers/world_book_provider.dart';
@@ -138,6 +139,7 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => TtsProvider()),
         ChangeNotifierProvider(create: (_) => UpdateProvider()),
         ChangeNotifierProvider(create: (_) => QuickPhraseProvider()),
+        ChangeNotifierProvider(create: (_) => SkillProvider()),
         ChangeNotifierProvider(create: (_) => InstructionInjectionProvider()),
         ChangeNotifierProvider(
           create: (_) => InstructionInjectionGroupProvider(),

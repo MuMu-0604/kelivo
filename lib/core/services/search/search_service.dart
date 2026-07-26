@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 // Import statements for service implementations
 import 'providers/bing_search_service.dart';
+import 'providers/baidu_search_service.dart';
+import 'providers/sogou_search_service.dart';
+import 'providers/so360_search_service.dart';
+import 'providers/hybrid_local_search_service.dart';
 import 'providers/tavily_search_service.dart';
 import 'providers/exa_search_service.dart';
 import 'providers/zhipu_search_service.dart';
@@ -32,8 +36,16 @@ abstract class SearchService<T extends SearchServiceOptions> {
   // Factory method to get service instance based on options type
   static SearchService getService(SearchServiceOptions options) {
     switch (options) {
+      case HybridLocalSearchOptions _:
+        return HybridLocalSearchService() as SearchService;
       case BingLocalOptions _:
         return BingSearchService() as SearchService;
+      case BaiduLocalOptions _:
+        return BaiduSearchService() as SearchService;
+      case SogouLocalOptions _:
+        return SogouSearchService() as SearchService;
+      case So360LocalOptions _:
+        return So360SearchService() as SearchService;
       case TavilyOptions _:
         return TavilySearchService() as SearchService;
       case ExaOptions _:
@@ -153,8 +165,16 @@ abstract class SearchServiceOptions {
   static SearchServiceOptions fromJson(Map<String, dynamic> json) {
     final type = json['type'] as String;
     switch (type) {
+      case 'hybrid_local':
+        return HybridLocalSearchOptions.fromJson(json);
       case 'bing_local':
         return BingLocalOptions.fromJson(json);
+      case 'baidu_local':
+        return BaiduLocalOptions.fromJson(json);
+      case 'sogou_local':
+        return SogouLocalOptions.fromJson(json);
+      case 'so360_local':
+        return So360LocalOptions.fromJson(json);
       case 'tavily':
         return TavilyOptions.fromJson(json);
       case 'exa':
@@ -186,13 +206,102 @@ abstract class SearchServiceOptions {
       case 'querit':
         return QueritOptions.fromJson(json);
       default:
-        return BingLocalOptions(id: json['id']);
+        return HybridLocalSearchOptions(id: json['id']);
     }
   }
 
-  static final SearchServiceOptions defaultOption = BingLocalOptions(
+  static final SearchServiceOptions defaultOption = HybridLocalSearchOptions(
     id: 'default',
   );
+}
+
+enum HybridLocalSearchMode { balanced, trusted, chinese, research, fast }
+
+enum HybridLocalProvider { bing, duckduckgo, baidu, sogou, so360 }
+
+class HybridLocalSearchOptions extends SearchServiceOptions {
+  final HybridLocalSearchMode mode;
+  final List<HybridLocalProvider> providers;
+  final int maxResultsPerProvider;
+  final int timeoutPerProviderMs;
+  final String duckDuckGoRegion;
+
+  HybridLocalSearchOptions({
+    required super.id,
+    this.mode = HybridLocalSearchMode.balanced,
+    List<HybridLocalProvider>? providers,
+    this.maxResultsPerProvider = 6,
+    this.timeoutPerProviderMs = 5000,
+    this.duckDuckGoRegion = 'us-en',
+  }) : providers = List.unmodifiable(
+         providers ??
+             const [
+               HybridLocalProvider.bing,
+               HybridLocalProvider.duckduckgo,
+               HybridLocalProvider.baidu,
+               HybridLocalProvider.sogou,
+               HybridLocalProvider.so360,
+             ],
+       );
+
+  List<HybridLocalProvider> get enabledProviders {
+    if (providers.isEmpty) {
+      return const [HybridLocalProvider.bing, HybridLocalProvider.duckduckgo];
+    }
+    if (mode == HybridLocalSearchMode.fast) {
+      return providers
+          .where(
+            (p) =>
+                p == HybridLocalProvider.bing ||
+                p == HybridLocalProvider.duckduckgo,
+          )
+          .toList(growable: false);
+    }
+    return providers;
+  }
+
+  @override
+  Map<String, dynamic> toJson() => {
+    'type': 'hybrid_local',
+    'id': id,
+    'mode': mode.name,
+    'providers': providers.map((e) => e.name).toList(),
+    'maxResultsPerProvider': maxResultsPerProvider,
+    'timeoutPerProviderMs': timeoutPerProviderMs,
+    'duckDuckGoRegion': duckDuckGoRegion,
+  };
+
+  factory HybridLocalSearchOptions.fromJson(Map<String, dynamic> json) {
+    HybridLocalSearchMode parseMode(String? value) {
+      return HybridLocalSearchMode.values.firstWhere(
+        (mode) => mode.name == value,
+        orElse: () => HybridLocalSearchMode.balanced,
+      );
+    }
+
+    HybridLocalProvider? parseProvider(Object? value) {
+      final name = value?.toString();
+      if (name == null) return null;
+      for (final provider in HybridLocalProvider.values) {
+        if (provider.name == name) return provider;
+      }
+      return null;
+    }
+
+    final providerValues = (json['providers'] as List?)
+        ?.map(parseProvider)
+        .whereType<HybridLocalProvider>()
+        .toList();
+
+    return HybridLocalSearchOptions(
+      id: json['id'],
+      mode: parseMode(json['mode']?.toString()),
+      providers: providerValues,
+      maxResultsPerProvider: json['maxResultsPerProvider'] ?? 6,
+      timeoutPerProviderMs: json['timeoutPerProviderMs'] ?? 5000,
+      duckDuckGoRegion: json['duckDuckGoRegion'] ?? 'us-en',
+    );
+  }
 }
 
 // Service-specific option classes
@@ -212,6 +321,84 @@ class BingLocalOptions extends SearchServiceOptions {
       BingLocalOptions(
         id: json['id'],
         acceptLanguage: json['acceptLanguage'] ?? 'en-US,en;q=0.9',
+      );
+}
+
+class BaiduLocalOptions extends SearchServiceOptions {
+  final String acceptLanguage;
+  final int pn;
+
+  BaiduLocalOptions({
+    required super.id,
+    this.acceptLanguage = 'zh-CN,zh;q=0.9,en;q=0.8',
+    this.pn = 0,
+  });
+
+  @override
+  Map<String, dynamic> toJson() => {
+    'type': 'baidu_local',
+    'id': id,
+    'acceptLanguage': acceptLanguage,
+    'pn': pn,
+  };
+
+  factory BaiduLocalOptions.fromJson(Map<String, dynamic> json) =>
+      BaiduLocalOptions(
+        id: json['id'],
+        acceptLanguage: json['acceptLanguage'] ?? 'zh-CN,zh;q=0.9,en;q=0.8',
+        pn: json['pn'] ?? 0,
+      );
+}
+
+class SogouLocalOptions extends SearchServiceOptions {
+  final String acceptLanguage;
+  final int page;
+
+  SogouLocalOptions({
+    required super.id,
+    this.acceptLanguage = 'zh-CN,zh;q=0.9,en;q=0.8',
+    this.page = 1,
+  });
+
+  @override
+  Map<String, dynamic> toJson() => {
+    'type': 'sogou_local',
+    'id': id,
+    'acceptLanguage': acceptLanguage,
+    'page': page,
+  };
+
+  factory SogouLocalOptions.fromJson(Map<String, dynamic> json) =>
+      SogouLocalOptions(
+        id: json['id'],
+        acceptLanguage: json['acceptLanguage'] ?? 'zh-CN,zh;q=0.9,en;q=0.8',
+        page: json['page'] ?? 1,
+      );
+}
+
+class So360LocalOptions extends SearchServiceOptions {
+  final String acceptLanguage;
+  final int page;
+
+  So360LocalOptions({
+    required super.id,
+    this.acceptLanguage = 'zh-CN,zh;q=0.9,en;q=0.8',
+    this.page = 1,
+  });
+
+  @override
+  Map<String, dynamic> toJson() => {
+    'type': 'so360_local',
+    'id': id,
+    'acceptLanguage': acceptLanguage,
+    'page': page,
+  };
+
+  factory So360LocalOptions.fromJson(Map<String, dynamic> json) =>
+      So360LocalOptions(
+        id: json['id'],
+        acceptLanguage: json['acceptLanguage'] ?? 'zh-CN,zh;q=0.9,en;q=0.8',
+        page: json['page'] ?? 1,
       );
 }
 

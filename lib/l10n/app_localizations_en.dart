@@ -5537,4 +5537,69 @@ class AppLocalizationsEn extends AppLocalizations {
   String debugPageManyMessagesSeedText(String role, int index) {
     return '$role message #$index: quick random debug sample for testing list rendering, scrolling stability, message grouping, and conversation history performance.';
   }
+
+  @override
+  String get assistantEditPageSkillsTab => 'Skills';
+
+  @override
+  String get assistantEditSkillsEmptyMessage =>
+      'No skills installed yet. Import a skill file first.';
+
+  @override
+  String get assistantEditManageSkillsButton => 'Manage Skills';
+
+  @override
+  String get skillsTitle => 'Skills';
+
+  @override
+  String get skillsImportTooltip => 'Import Skills';
+
+  @override
+  String get skillsAddTooltip => 'Add Skill';
+
+  @override
+  String get skillsEmptyMessage =>
+      'Import Markdown, JSON, YAML, PDF, DOCX, or ZIP skills.';
+
+  @override
+  String get skillsImportButton => 'Import Skill';
+
+  @override
+  String get skillsDeleteAction => 'Delete';
+
+  @override
+  String skillsImportFailed(String error) {
+    return 'Skills import failed: $error';
+  }
+
+  @override
+  String get skillsNoValidImported => 'No valid skill files imported.';
+
+  @override
+  String skillsImportedCount(int count) {
+    return 'Imported $count skill(s).';
+  }
+
+  @override
+  String skillsTriggersLine(String keywords) {
+    return 'Triggers: $keywords';
+  }
+
+  @override
+  String get skillsSaveButton => 'Save';
+
+  @override
+  String get skillsNameLabel => 'Name';
+
+  @override
+  String get skillsDescriptionLabel => 'Description';
+
+  @override
+  String get skillsTriggerKeywordsLabel => 'Trigger keywords';
+
+  @override
+  String get skillsTriggerKeywordsHint => 'code review, dcf, rewrite';
+
+  @override
+  String get skillsContentHint => 'Paste skill instructions here.';
 }

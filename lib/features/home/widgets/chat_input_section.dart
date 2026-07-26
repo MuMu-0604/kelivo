@@ -7,6 +7,7 @@ import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/mcp_provider.dart';
 import '../../../core/providers/quick_phrase_provider.dart';
+import '../../../core/providers/skill_provider.dart';
 import '../../../core/providers/instruction_injection_provider.dart';
 import '../../../core/providers/world_book_provider.dart';
 import '../utils/model_display_helper.dart';
@@ -43,6 +44,7 @@ class ChatInputSection extends StatelessWidget {
     this.onSelectModel,
     this.onLongPressSelectModel,
     this.onOpenMcp,
+    this.onOpenSkills,
     this.onLongPressMcp,
     this.onOpenSearch,
     this.onConfigureReasoning,
@@ -85,6 +87,7 @@ class ChatInputSection extends StatelessWidget {
   final VoidCallback? onSelectModel;
   final VoidCallback? onLongPressSelectModel;
   final VoidCallback? onOpenMcp;
+  final VoidCallback? onOpenSkills;
   final VoidCallback? onLongPressMcp;
   final VoidCallback? onOpenSearch;
   final VoidCallback? onConfigureReasoning;
@@ -135,6 +138,7 @@ class ChatInputSection extends StatelessWidget {
       onLongPressSelectModel: onLongPressSelectModel,
       conversationId: conversationId,
       onOpenMcp: onOpenMcp,
+      onOpenSkills: onOpenSkills,
       onLongPressMcp: onLongPressMcp,
       onStop: onStop,
       modelIcon: (pk != null && mid != null)
@@ -172,6 +176,7 @@ class ChatInputSection extends StatelessWidget {
       onCancelQueuedInput: onCancelQueuedInput,
       showMcpButton: _shouldShowMcpButton(context, settings, a, pk, mid),
       mcpActive: _isMcpActive(context, a),
+      skillsActive: _isSkillsActive(context, a),
       showQuickPhraseButton: _hasQuickPhrases(context, a),
       onQuickPhrase: onQuickPhrase,
       onLongPressQuickPhrase: onLongPressQuickPhrase,
@@ -275,6 +280,13 @@ class ChatInputSection extends StatelessWidget {
     final selected = a?.mcpServerIds ?? const <String>[];
     if (selected.isEmpty || connected.isEmpty) return false;
     return connected.any((s) => selected.contains(s.id));
+  }
+
+  bool _isSkillsActive(BuildContext context, Assistant? a) {
+    final selected = a?.skillIds ?? const <String>[];
+    if (selected.isEmpty) return false;
+    final provider = context.watch<SkillProvider>();
+    return selected.any((id) => provider.getById(id)?.enabled ?? false);
   }
 
   bool _hasQuickPhrases(BuildContext context, Assistant? a) {

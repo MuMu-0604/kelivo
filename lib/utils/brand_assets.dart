@@ -67,6 +67,13 @@ class BrandAssets {
         MapEntry(RegExp(r'longcat'), 'longcat.png'),
         MapEntry(RegExp(r'iflow|心流'), 'iflow-color.svg'),
         MapEntry(RegExp(r'sora'), 'sora-color.svg'),
+        MapEntry(RegExp(r'hybrid local|local hybrid|hybrid search'), 'web.svg'),
+        MapEntry(RegExp(r'baidu'), 'baidu-color.svg'),
+        MapEntry(RegExp(r'sogou'), 'sogou-color.svg'),
+        MapEntry(
+          RegExp(r'(^|\b)(so360|360 search|360\s|360$|qihoo|haosou|so\.com)'),
+          'so360-color.svg',
+        ),
         MapEntry(RegExp(r'bing|必应'), 'bing-color.svg'),
         MapEntry(RegExp(r'tavily'), 'tavily-color.svg'),
         MapEntry(RegExp(r'exa'), 'exa-color.svg'),
@@ -271,6 +278,21 @@ class BrandAssets {
       id: 'bing',
       label: 'Bing',
       asset: 'assets/icons/bing-color.svg',
+    ),
+    BrandIconOption(
+      id: 'baidu',
+      label: 'Baidu',
+      asset: 'assets/icons/baidu-color.svg',
+    ),
+    BrandIconOption(
+      id: 'sogou',
+      label: 'Sogou',
+      asset: 'assets/icons/sogou-color.svg',
+    ),
+    BrandIconOption(
+      id: 'so360',
+      label: '360 Search',
+      asset: 'assets/icons/so360-color.svg',
     ),
     BrandIconOption(
       id: 'tavily',

@@ -271,6 +271,16 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
                     .read<AssistantProvider>()
                     .updateAssistant(a.copyWith(streamOutput: v)),
               ),
+              _iosDivider(context),
+              _iosSwitchRow(
+                context,
+                icon: Lucide.Shield,
+                label: 'App Control Agent',
+                value: a.appControlEnabled,
+                onChanged: (v) => context
+                    .read<AssistantProvider>()
+                    .updateAssistant(a.copyWith(appControlEnabled: v)),
+              ),
             ],
           ),
         ),
