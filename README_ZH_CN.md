@@ -79,8 +79,8 @@ GitHub 工具按使用场景分组封装，不再把每个 API 端点都暴露�
 
 下载地址：
 
-- 最新 Release 页面：[Kelivo Plus 1.1.17+4071](https://github.com/MuMu-0604/kelivo/releases/tag/v1.1.17-plus.4071)
-- Android 通用 APK 直链：[Kelivo_android_1.1.17+4071_neural-authority-gateway_fixedsign_universal.apk](https://github.com/MuMu-0604/kelivo/releases/download/v1.1.17-plus.4071/Kelivo_android_1.1.17%2B4071_neural-authority-gateway_fixedsign_universal.apk)
+- 最新 Release 页面：[Kelivo Plus 1.1.17+4073](https://github.com/MuMu-0604/kelivo/releases/tag/v1.1.17-plus.4073)
+- Android 通用 APK 直链：[Kelivo_android_1.1.17+4073_neural-authority-gateway_fixedsign_universal.apk](https://github.com/MuMu-0604/kelivo/releases/download/v1.1.17-plus.4073/Kelivo_android_1.1.17%2B4073_gateway-report-fixes_fixedsign_universal.apk)
 
 本公开 APK 的 Android 包名仍为 `com.psyche.kelivo`，与原版 Kelivo 相同，因此需要注意：
 
