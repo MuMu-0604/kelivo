@@ -1,153 +1,170 @@
 # Kelivo Plus
 
-[简体中文](README_ZH_CN.md) | English
+**???? / Chinese first**
 
-Kelivo Plus is a modified open-source build based on [Chevey339/kelivo](https://github.com/Chevey339/kelivo). The original Kelivo is a cross-platform Flutter LLM chat client. This fork keeps the original chat, model provider, multimodal, MCP, search, and mobile/desktop foundations, then adds stronger mobile agent control, built-in tools, Skills, local hybrid search, and writable GitHub MCP tooling.
 
-> Fork notice: this repository is not the official upstream repository. It is a secondary development build based on the original Kelivo project. Original copyright, acknowledgements, and license terms are preserved. This project remains licensed under AGPL-3.0.
+Kelivo Plus 是基于 [Chevey339/kelivo](https://github.com/Chevey339/kelivo) 的二次开发版本。原版 Kelivo 是一个跨平台 Flutter LLM 聊天客户端，本版本在保留原有模型接入、聊天、多模态、MCP、搜索和桌面/移动端体验的基础上，重点增强了移动端 AI 自主配置、内置工具、技能系统、本地混合搜索和 GitHub 写入型 MCP 工具。
 
-## What Changed From Upstream
+> 二次开发声明：本仓库不是原作者官方仓库，代码基于原项目进行扩展与改造。原项目版权、协议与鸣谢请见原仓库和本仓库保留的 `LICENSE`。本项目继续遵循 AGPL-3.0 协议开源。
 
-| Area | Upstream Kelivo | Kelivo Plus |
+## 与原版的主要差异
+
+| 模块 | 原版 Kelivo | Kelivo Plus 二改版 |
 | --- | --- | --- |
-| Assistant configuration | Mostly manual settings pages | 神经权能网关 can import and edit configuration from chat after explicit assistant authorization |
-| Assistant permissions | Standard assistant settings | Adds an opt-in 神经权能网关 permission switch for app configuration control |
-| Skills | No standalone reusable Skills workflow | Adds Skill model, importer, Skills page, assistant binding, and trigger-based injection |
-| Built-in MCP | MCP integration with built-in Fetch | Adds built-in Files, Images, GitHub, and in-memory MCP services |
-| GitHub tools | Read-oriented or basic tooling | Adds grouped write-capable tools for repos, files, issues, PRs, releases, actions, secrets, and variables |
-| Search | Multiple API-backed providers | Adds API-key-free local hybrid search using Bing Local, DuckDuckGo, Baidu, Sogou, and 360 with filtering/ranking |
-| Mobile import flow | Mostly manual import | Supports chat-driven import from text, previous generated content, shared files, and user instructions |
-| Tool UX | Tool list can be noisy | Adds Chinese visible tool descriptions and grouped tool surfaces |
+| 助手配置 | 主要依靠用户手动进入设置页编辑 | 新增神经权能网关，允许获得授权的助手在对话中执行配置导入、修改与撤销 |
+| 助手权限 | 普通助手设置 | 新增“允许该助手启用神经权能网关”的权限开关，默认关闭 |
+| 技能系统 | 无独立 Skills 工作流 | 新增技能模型、导入器、技能页、助手技能绑定和触发注入 |
+| MCP 工具 | 原有 MCP 接入与内置 Fetch | 新增内置 Files、Images、GitHub 等 MCP 服务，并优化工具折叠与中文说明 |
+| GitHub 工具 | 偏只读/基础能力 | 新增分组式写入工具，覆盖仓库、分支、文件、Issue、PR、Release、Actions、Secrets、Variables 等能力 |
+| 搜索 | 多 API 搜索服务 | 新增本地混合搜索，聚合 Bing Local、DuckDuckGo、百度、搜狗、360，带过滤、去重和排序 |
+| 移动端导入 | 手动导入为主 | 支持对话中从文本、上一条生成内容、分享文件等来源导入到目标配置 |
+| 工具体验 | 工具列表较分散 | 工具可见介绍中文化，部分工具分组封装，降低上下文噪声 |
 
-## Highlights
+## 核心功能
 
 ### 神经权能网关
 
-- Enable per assistant through the “Allow this assistant to use 神经权能网关” switch.
-- Import user-provided instructions, pasted text, shared files, or newly generated content into app configuration targets.
-- Supported targets include assistant system prompts, memory, Skills, instruction injection, world books, MCP bindings, local tools, quick phrases, and search settings.
-- Adds delete/update/list/detail operations, world-book entry editing, quick-phrase reorder, Skill version snapshots/rollback, batch import/export, and an audit log.
-- Recent changes can be undone.
-- Disabled by default and intended only for trusted assistants.
+- 在助手设置中开启“允许该助手启用神经权能网关”后，助手可以通过对话执行授权范围内的配置操作。
+- 支持把用户提供的指令、粘贴内容、文件内容、或“刚刚生成的内容”导入到指定位置。
+- 支持目标包括当前助手系统提示词、记忆、技能、指令注入、世界书、MCP 绑定、本地工具、快捷短语、搜索设置等。
+- 补齐删除、更新、列表/详情、世界书 entry 细粒度编辑、快捷短语排序、技能版本快照/回滚、批量导入导出和权限审计能力。
+- 支持执行结果回显与撤销，降低误操作风险。
+- 权限默认关闭，适合只给可信助手开启。
 
-Example prompts:
+示例：
 
 ```text
-Import the content you just generated as a Skill, bind it to the current assistant, and use review/code-review as trigger keywords.
+把上面生成的代码审查规范导入为一个技能，绑定到当前助手，并设置触发词：review、代码审查。
 ```
 
 ```text
-Create a world book from this setting document and use character and location names as keywords.
+根据我发的这份设定文档，创建一个世界书，关键词用角色名和地点名。
 ```
 
-### Skills
+### Skills 技能系统
 
-- Create, edit, delete, and import reusable Skills.
-- Import Markdown, JSON, YAML, DOCX, and ZIP-based skill files.
-- Bind Skills to assistants or activate them with trigger keywords.
+- 支持创建、编辑、删除、导入技能。
+- 支持 Markdown、JSON、YAML、DOCX、ZIP 等格式导入。
+- 技能可绑定到指定助手，也可以通过触发词自动注入。
+- 适合沉淀可复用工作流，例如代码审查、写作润色、商业分析、翻译风格、角色设定等。
 
-### Built-In MCP Tools
+### 内置 MCP 工具
 
-- `@kelivo/fetch`: fetch and extract web content.
-- `@kelivo/files`: local file read/write and directory operations.
-- `@kelivo/images`: image-oriented helper tools.
-- `@kelivo/github`: GitHub repository, file, issue, PR, release, Actions, secrets, and variables operations.
+- `@kelivo/fetch`：网页抓取和内容提取。
+- `@kelivo/files`：本地文件读取、写入、目录浏览等文件能力。
+- `@kelivo/images`：图片理解、图片任务辅助能力。
+- `@kelivo/github`：GitHub 仓库、文件、Issue、PR、Release、Actions、Secrets、Variables 等能力。
+- 内置 MCP 运行在 App 内部，不需要用户额外启动 Node/Python 服务。
 
-### Mobile Reasoning Slider
+### 移动端推理强度滑块
 
-- Replaces the mobile reasoning bottom sheet with a compact slider-first control.
-- Keeps existing `thinkingBudget` storage and provider request mapping.
-- Adds the `Ultracode` visual preset for the highest available reasoning level, with right-to-left purple particle flow.
-- Keeps Off, Auto, and Custom as secondary actions below the slider.
+- 将移动端原来的推理强度底部弹窗改为紧凑滑块控件。
+- 保留原有 `thinkingBudget` 存储和各模型服务商请求映射，不改变底层推理参数链路。
+- 最高可用档位增加 `Ultracode` 视觉预设，并带有从右向左流动的紫色粒子效果。
+- `关闭`、`自动`、`自定义` 保留为滑块下方的辅助操作。
 
-### GitHub Write Tools
+### GitHub 写入工具
 
-The GitHub MCP server exposes grouped tools instead of one tool per API endpoint:
+GitHub 工具按使用场景分组封装，不再把每个 API 端点都暴露成一个独立工具：
 
-- Repository and file operations.
-- Branch, tag, commit, directory, and file management.
-- Issue and pull request workflows.
-- Pull request merge and review comments, including inline and file-level comments.
-- Release management.
-- GitHub Actions workflow/run/job/log operations.
-- Repository/environment secrets and variables.
+- 仓库管理：创建/查看/更新/删除仓库，管理分支、标签、提交、目录和文件。
+- Issue 管理：创建、更新、关闭、评论、标签、指派等。
+- PR 管理：创建、更新、合并、关闭、审查、行内评论、回复评论等。
+- Release 管理：创建、编辑、发布、删除 release 和资源。
+- Actions 管理：读取 workflow/run/job/log，触发、取消、重跑工作流。
+- Secrets / Variables：仓库和环境级变量、密钥管理。
 
-The wrapper layer also follows GitHub API constraints more strictly: empty repositories are initialized before branch creation, reserved `GITHUB_` variable names are rejected early, fresh writes are verified with strong read APIs instead of code search, PR updates use minimal payloads, and review-comment creation is separated from reply-comment payloads.
+工具层已加入 GitHub API 规则收敛：空仓库建分支自动初始化、禁止 `GITHUB_` 变量名前缀、写入后使用强一致接口验证、PR 更新最小 payload、行内评论和回复评论分路径处理。
 
-### Local Hybrid Search
+### 本地混合搜索
 
-- API-key-free local search mode.
-- Aggregates Bing Local, DuckDuckGo, Baidu, Sogou, and 360.
-- Isolates provider failures, deduplicates URLs, removes low-value results, and ranks by provider/source quality.
+- 新增 Local Hybrid Search，无需 API Key。
+- 聚合 Bing Local、DuckDuckGo、百度、搜狗、360。
+- 中文查询会自动利用中文搜索源，英文/通用查询优先使用更稳定的本地源。
+- 对搜索结果进行广告过滤、坏站过滤、URL 清洗、去重和权重排序。
 
-## Usage
+## 使用说明
 
-### Install Android APK
+### 安装 APK
 
-Download links:
+下载地址：
 
-- Latest Release page: [Kelivo Plus 1.1.17+9015](https://github.com/MuMu-0604/kelivo/releases/tag/v1.1.17-plus.9015)
-- Direct Android universal APK: [Kelivo_android_1.1.17+9015_reasoning-help-right-particles_coexist_fixedsign_universal.apk](https://github.com/MuMu-0604/kelivo/releases/download/v1.1.17-plus.9015/Kelivo_android_1.1.17%2B9015_reasoning-help-right-particles_coexist_fixedsign_universal.apk)
+- 最新 Release 页面：[Kelivo Plus 1.1.17+9015（可与原版共存）](https://github.com/MuMu-0604/kelivo/releases/tag/v1.1.17-plus.9015)
+- Android 通用 APK 直链：[Kelivo_android_1.1.17+9015_reasoning-help-right-particles_coexist_fixedsign_universal.apk](https://github.com/MuMu-0604/kelivo/releases/download/v1.1.17-plus.9015/Kelivo_android_1.1.17%2B9015_reasoning-help-right-particles_coexist_fixedsign_universal.apk)
 
-The 1.1.17+9015 APK is a coexistence build that uses Android package name `com.psyche.kelivo.sliderpreview` and launcher label `Kelivo Slider`, so it can install beside upstream Kelivo instead of replacing it.
+`9015` 是可与原版 Kelivo 共存的安装包：
 
-- It has separate Android app data from the upstream `com.psyche.kelivo` package.
-- It can update older coexistence builds only when the signing certificate matches and the version code is not lower.
-- The default source build still uses `com.psyche.kelivo`; pass Gradle properties when building a coexistence variant.
+- Android 包名：`com.psyche.kelivo.sliderpreview`
+- 桌面/启动器名称：`Kelivo Slider`
+- 可与原版 Kelivo 的 `com.psyche.kelivo` 同时安装。
+- 与原版 Kelivo 使用独立应用数据，不会直接读取原版私有数据。
+- 如需迁移数据，请通过备份/导入完成，而不是直接共享应用私有目录。
 
-Recommended installation path:
+推荐安装方式：
 
-1. Back up or export data from upstream Kelivo if needed.
-2. Uninstall upstream Kelivo.
-3. Install the Kelivo Plus APK from Releases.
-4. Import backups or reconfigure providers, assistants, MCP, and GitHub Token.
+1. 如需保留原版数据，先在原版 Kelivo 内完成备份或导出。
+2. 直接安装 `9015` 共存包，无需卸载原版 Kelivo。
+3. 打开桌面上的 `Kelivo Slider`。
+4. 按需通过备份/导入迁移配置、聊天记录、助手、MCP 和模型设置。
 
-To build a coexistence variant from source, keep the same codebase and pass app identity overrides:
+如需自行构建共存包，可以在不改源码默认包名的情况下传入 Gradle 参数：
 
 ```powershell
 flutter build apk --release `
-  --dart-define=APP_FLAVOR=slider `
   -PkelivoApplicationId=com.psyche.kelivo.sliderpreview `
   -PkelivoAppLabel="Kelivo Slider"
 ```
 
-Treat coexistence builds as separate apps with separate app data; migrate data through backup/import rather than direct private-data sharing.
+默认源码构建仍使用原包名 `com.psyche.kelivo`；只有传入上述参数时才会生成共存包。
 
-### Configure Models
+### 配置模型
 
-1. Open Kelivo Plus.
-2. Add a model provider such as OpenAI, Gemini, Anthropic, or another compatible endpoint.
-3. Select the model in chat and start using it.
+1. 打开 Kelivo Plus。
+2. 进入模型或服务商设置。
+3. 添加 OpenAI、Gemini、Anthropic 或其他兼容服务商。
+4. 回到聊天页选择模型并开始对话。
 
-### Enable 神经权能网关
+### 开启神经权能网关
 
-1. Open an assistant settings page.
-2. Enable “Allow this assistant to use 神经权能网关”.
-3. Ask the assistant to import or edit a supported configuration target from chat.
-4. Review the generated action and undo recent changes when needed.
+1. 进入助手设置。
+2. 找到权限开关“允许该助手启用神经权能网关”。
+3. 仅对可信助手开启。
+4. 在对话中直接提出配置需求，例如“把这段内容导入为当前助手的系统提示词”。
+5. 执行前根据提示确认，执行后可撤销最近一次变更。
 
-### Configure GitHub Token
+### 使用 Skills
 
-1. Open the MCP page.
-2. Edit the built-in GitHub MCP server.
-3. Paste a GitHub token into the GitHub Token field.
-4. Grant only the scopes you need, commonly `repo` and `workflow` for write workflows.
+1. 进入 Skills 页面。
+2. 新建技能，或导入 Markdown/JSON/YAML/DOCX/ZIP 技能文件。
+3. 在助手设置的 Skills 标签页中绑定技能。
+4. 聊天时也可以通过触发词自动启用相关技能。
 
-### Use Local Hybrid Search
+### 配置 GitHub Token
 
-1. Open Search service settings.
-2. Enable Local Hybrid Search.
-3. No API key is required.
+1. 进入 MCP 页面。
+2. 编辑内置 GitHub MCP 服务。
+3. 在 GitHub Token 输入框填入 token。
+4. 根据需要授予 `repo`、`workflow` 等 scope。
+5. 回到聊天中调用 GitHub 工具。
 
-## Build From Source
+建议使用最小权限 token，并只给可信助手开放写入型 GitHub 操作。
 
-Recommended environment:
+### 使用本地混合搜索
 
-- Flutter 3.44.1 or newer
-- Dart 3.12.1 or newer
-- Android SDK/NDK for Android builds
+1. 进入搜索服务设置。
+2. 启用 Local Hybrid Search。
+3. 无需配置 API Key。
+4. 在聊天中启用搜索后，助手会使用本地混合搜索返回结果。
 
-Common commands:
+## 从源码构建
+
+环境建议：
+
+- Flutter 3.44.1 或更高版本
+- Dart 3.12.1 或更高版本
+- Android SDK / NDK，Android 构建建议使用 arm64-v8a release 目标
+
+常用命令：
 
 ```powershell
 flutter pub get
@@ -155,28 +172,41 @@ flutter test test/core/providers/mcp_provider_builtin_test.dart test/kelivo_gith
 flutter build apk --release --target-platform android-arm64
 ```
 
-The repository does not include signing secrets. Configure your own `android/key.properties` or Android signing workflow before publishing APKs.
+本地签名文件不包含在仓库中。需要自行配置 `android/key.properties` 或使用自己的 Android 签名方案。
 
-## Security Notes
+## 安全说明
 
-- 神经权能网关 is a high-permission capability and is disabled by default. Destructive, overwrite, and batch import operations remain confirmation-driven and undoable where supported.
-- GitHub write tools can modify remote repositories; use least-privilege tokens.
-- Do not commit tokens, secrets, keystores, `android/key.properties`, build caches, or APK outputs.
-- AGPL-3.0 obligations apply when distributing modified builds.
+- 神经权能网关是高权限能力，默认关闭，建议只给可信助手开启；高风险覆盖、删除和批量导入操作会走确认与可撤销流程。
+- GitHub 写入工具会修改远程仓库，请使用最小权限 token。
+- Secrets、Token、Keystore、`android/key.properties`、构建缓存和 APK 产物不应提交到仓库。
+- 本项目保留 AGPL-3.0 协议要求，分发修改版时请同步提供对应源码。
 
-## Documentation
+## 文档
 
-- [Chinese README](README_ZH_CN.md)
-- [Kelivo Plus change notes](docs/KELIVO_PLUS_CHANGES_ZH.md)
-- [Android installation and coexistence guide](docs/ANDROID_INSTALLATION_ZH.md)
-- [Release notes](docs/RELEASE_NOTES_1.1.17_PLUS.md)
-- [Search upgrade notes](docs/KELIVO_SEARCH_UPGRADE_NOTES.md)
+- [二改功能说明](docs/KELIVO_PLUS_CHANGES_ZH.md)
+- [Android 安装与共存说明](docs/ANDROID_INSTALLATION_ZH.md)
+- [Release 说明](docs/RELEASE_NOTES_1.1.17_PLUS.md)
+- [搜索升级记录](docs/KELIVO_SEARCH_UPGRADE_NOTES.md)
 
-## Acknowledgements
+## 致谢
 
-- Original project: [Chevey339/kelivo](https://github.com/Chevey339/kelivo)
-- UI inspiration: [RikkaHub](https://github.com/re-ovo/rikkahub)
+- 原项目：[Chevey339/kelivo](https://github.com/Chevey339/kelivo)
+- UI 灵感来源：[RikkaHub](https://github.com/re-ovo/rikkahub)
+- 感谢原作者和社区贡献者提供的基础工程。
 
 ## License
 
-Kelivo Plus is licensed under AGPL-3.0. See [LICENSE](LICENSE) for details.
+本项目基于 AGPL-3.0 协议开源，详见 [LICENSE](LICENSE)。
+
+---
+
+## English Summary
+
+Kelivo Plus is a modified open-source build based on [Chevey339/kelivo](https://github.com/Chevey339/kelivo). The latest `1.1.17+9015` Android APK is a coexistence build:
+
+- Package name: `com.psyche.kelivo.sliderpreview`
+- Launcher label: `Kelivo Slider`
+- It can be installed beside upstream Kelivo (`com.psyche.kelivo`) and keeps separate app data.
+- Release page: [v1.1.17-plus.9015](https://github.com/MuMu-0604/kelivo/releases/tag/v1.1.17-plus.9015)
+
+The full primary documentation is now maintained in Chinese first.
