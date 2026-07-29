@@ -1,6 +1,6 @@
 # Kelivo Plus
 
-**???? / Chinese first**
+**中文优先 / Chinese first**
 
 
 Kelivo Plus 是基于 [Chevey339/kelivo](https://github.com/Chevey339/kelivo) 的二次开发版本。原版 Kelivo 是一个跨平台 Flutter LLM 聊天客户端，本版本在保留原有模型接入、聊天、多模态、MCP、搜索和桌面/移动端体验的基础上，重点增强了移动端 AI 自主配置、内置工具、技能系统、本地混合搜索和 GitHub 写入型 MCP 工具。
