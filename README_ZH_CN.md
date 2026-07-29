@@ -53,6 +53,13 @@ Kelivo Plus 是基于 [Chevey339/kelivo](https://github.com/Chevey339/kelivo) �
 - `@kelivo/github`：GitHub 仓库、文件、Issue、PR、Release、Actions、Secrets、Variables 等能力。
 - 内置 MCP 运行在 App 内部，不需要用户额外启动 Node/Python 服务。
 
+### 移动端推理强度滑块
+
+- 将移动端原来的推理强度底部弹窗改为紧凑滑块控件。
+- 保留原有 `thinkingBudget` 存储和各模型服务商请求映射，不改变底层推理参数链路。
+- 最高可用档位增加 `Ultracode` 视觉预设，并带有从右向左流动的紫色粒子效果。
+- `关闭`、`自动`、`自定义` 保留为滑块下方的辅助操作。
+
 ### GitHub 写入工具
 
 GitHub 工具按使用场景分组封装，不再把每个 API 端点都暴露成一个独立工具：
@@ -79,30 +86,33 @@ GitHub 工具按使用场景分组封装，不再把每个 API 端点都暴露�
 
 下载地址：
 
-- 最新 Release 页面：[Kelivo Plus 1.1.17+4073](https://github.com/MuMu-0604/kelivo/releases/tag/v1.1.17-plus.4073)
-- Android 通用 APK 直链：[Kelivo_android_1.1.17+4073_gateway-report-fixes_fixedsign_universal.apk](https://github.com/MuMu-0604/kelivo/releases/download/v1.1.17-plus.4073/Kelivo_android_1.1.17%2B4073_gateway-report-fixes_fixedsign_universal.apk)
+- 最新 Release 页面：[Kelivo Plus 1.1.17+9015（可与原版共存）](https://github.com/MuMu-0604/kelivo/releases/tag/v1.1.17-plus.9015)
+- Android 通用 APK 直链：[Kelivo_android_1.1.17+9015_reasoning-help-right-particles_coexist_fixedsign_universal.apk](https://github.com/MuMu-0604/kelivo/releases/download/v1.1.17-plus.9015/Kelivo_android_1.1.17%2B9015_reasoning-help-right-particles_coexist_fixedsign_universal.apk)
 
-本公开 APK 的 Android 包名仍为 `com.psyche.kelivo`，与原版 Kelivo 相同，因此需要注意：
+`9015` 是可与原版 Kelivo 共存的安装包：
 
-- 不能直接覆盖安装原版 Kelivo：原版和本二改版通常使用不同签名，Android 会拒绝安装。
-- 不能与原版 Kelivo 直接共存：同一台设备上同一个包名只能安装一个应用。
-- 可以覆盖安装旧的 Kelivo Plus 二改版：前提是旧二改版使用同一签名，并且当前版本号不低于已安装版本。
+- Android 包名：`com.psyche.kelivo.sliderpreview`
+- 桌面/启动器名称：`Kelivo Slider`
+- 可与原版 Kelivo 的 `com.psyche.kelivo` 同时安装。
+- 与原版 Kelivo 使用独立应用数据，不会直接读取原版私有数据。
+- 如需迁移数据，请通过备份/导入完成，而不是直接共享应用私有目录。
 
 推荐安装方式：
 
 1. 如需保留原版数据，先在原版 Kelivo 内完成备份或导出。
-2. 卸载原版 Kelivo。
-3. 安装 Release 中的 Kelivo Plus APK。
-4. 重新导入配置、聊天记录或手动完成必要设置。
+2. 直接安装 `9015` 共存包，无需卸载原版 Kelivo。
+3. 打开桌面上的 `Kelivo Slider`。
+4. 按需通过备份/导入迁移配置、聊天记录、助手、MCP 和模型设置。
 
-如需与原版共存，需要构建独立包名版本：
+如需自行构建共存包，可以在不改源码默认包名的情况下传入 Gradle 参数：
 
-1. 将 Android `applicationId` 改为例如 `com.psyche.kelivo.plus`。
-2. 建议同步修改应用名称为 `Kelivo Plus`，避免桌面图标混淆。
-3. 使用自己的签名重新构建 APK。
-4. 该共存版会拥有独立应用数据，不能直接读取原版 Kelivo 的私有数据；需要通过备份/导入迁移。
+```powershell
+flutter build apk --release `
+  -PkelivoApplicationId=com.psyche.kelivo.sliderpreview `
+  -PkelivoAppLabel="Kelivo Slider"
+```
 
-当前 Release 附带的是同包名升级包，不是共存包。
+默认源码构建仍使用原包名 `com.psyche.kelivo`；只有传入上述参数时才会生成共存包。
 
 ### 配置模型
 
