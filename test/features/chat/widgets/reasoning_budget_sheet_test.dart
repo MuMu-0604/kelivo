@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:Kelivo/core/providers/assistant_provider.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/features/chat/widgets/reasoning_budget_sheet.dart';
+import 'package:Kelivo/features/chat/widgets/thinking_effort_slider.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 
 Future<SettingsProvider> _settingsForClaudeModel(
@@ -36,6 +37,8 @@ Future<SettingsProvider> _settingsForClaudeModel(
 Future<void> _pumpSheetLauncher(
   WidgetTester tester, {
   required SettingsProvider settings,
+  String? modelProvider,
+  String? modelId,
 }) async {
   await tester.pumpWidget(
     MultiProvider(
@@ -53,7 +56,11 @@ Future<void> _pumpSheetLauncher(
             builder: (context) {
               return TextButton(
                 key: const ValueKey('open-reasoning-sheet'),
-                onPressed: () => showReasoningBudgetSheet(context),
+                onPressed: () => showReasoningBudgetSheet(
+                  context,
+                  modelProvider: modelProvider,
+                  modelId: modelId,
+                ),
                 child: const Text('open'),
               );
             },
@@ -73,19 +80,30 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('ReasoningBudgetSheet', () {
-    testWidgets('shows max reasoning for Claude Fable 5', (tester) async {
-      final settings = await _settingsForClaudeModel(tester, 'claude-fable-5');
-      await _pumpSheetLauncher(tester, settings: settings);
+    testWidgets('shows slider max reasoning for Claude Fable 5', (
+      tester,
+    ) async {
+      const modelId = 'claude-fable-5';
+      final settings = await _settingsForClaudeModel(tester, modelId);
+      await _pumpSheetLauncher(
+        tester,
+        settings: settings,
+        modelProvider: 'Claude',
+        modelId: modelId,
+      );
 
       await _openSheet(tester);
 
-      expect(find.text('Extreme Reasoning'), findsOneWidget);
-      expect(find.text('Maximum Reasoning'), findsOneWidget);
+      expect(find.text('Faster'), findsOneWidget);
+      expect(find.text('Smarter'), findsOneWidget);
 
-      await tester.tap(find.text('Maximum Reasoning'));
-      await tester.pumpAndSettle();
+      final track = find.byKey(ThinkingEffortSlider.sliderKey);
+      final rect = tester.getRect(track);
+      await tester.tapAt(rect.centerRight - const Offset(2, 0));
+      await tester.pump(const Duration(milliseconds: 120));
 
       expect(settings.thinkingBudget, 128000);
+      expect(find.text('Ultracode'), findsOneWidget);
     });
 
     testWidgets('keeps max reasoning hidden for older Claude models', (
@@ -95,12 +113,22 @@ void main() {
         tester,
         'claude-sonnet-4-5',
       );
-      await _pumpSheetLauncher(tester, settings: settings);
+      await _pumpSheetLauncher(
+        tester,
+        settings: settings,
+        modelProvider: 'Claude',
+        modelId: 'claude-sonnet-4-5',
+      );
 
       await _openSheet(tester);
 
-      expect(find.text('Extreme Reasoning'), findsNothing);
-      expect(find.text('Maximum Reasoning'), findsNothing);
+      final track = find.byKey(ThinkingEffortSlider.sliderKey);
+      final rect = tester.getRect(track);
+      await tester.tapAt(rect.centerRight - const Offset(2, 0));
+      await tester.pump(const Duration(milliseconds: 120));
+
+      expect(find.text('Ultracode'), findsNothing);
+      expect(settings.thinkingBudget, 32000);
     });
   });
 }

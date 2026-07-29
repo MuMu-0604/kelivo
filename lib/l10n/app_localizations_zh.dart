@@ -1939,6 +1939,28 @@ class AppLocalizationsZh extends AppLocalizations {
   String get reasoningBudgetSheetXhighSubtitle => '使用最大推理深度，适合最复杂的问题';
 
   @override
+  String get reasoningBudgetSheetMaxSubtitle => '使用最深可用推理，适合高风险或非常复杂的任务';
+
+  @override
+  String get reasoningBudgetSheetUltracode => 'Ultracode';
+
+  @override
+  String get reasoningBudgetSheetUltracodeSubtitle =>
+      '深度执行预设，适合复杂工程、长上下文和多步验证任务';
+
+  @override
+  String get reasoningBudgetSheetFastLabel => '更快';
+
+  @override
+  String get reasoningBudgetSheetSmartLabel => '更聪明';
+
+  @override
+  String get reasoningBudgetSheetHelpTooltip => '查看当前推理档位说明';
+
+  @override
+  String get reasoningBudgetSheetCustomShortLabel => '自定义';
+
+  @override
   String get reasoningBudgetSheetCustomLabel => '自定义推理预算';
 
   @override
@@ -7321,6 +7343,28 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get reasoningBudgetSheetXhighSubtitle => '使用最大推理深度，适合最复杂的问题';
 
   @override
+  String get reasoningBudgetSheetMaxSubtitle => '使用最深可用推理，适合高风险或非常复杂的任务';
+
+  @override
+  String get reasoningBudgetSheetUltracode => 'Ultracode';
+
+  @override
+  String get reasoningBudgetSheetUltracodeSubtitle =>
+      '深度执行预设，适合复杂工程、长上下文和多步验证任务';
+
+  @override
+  String get reasoningBudgetSheetFastLabel => '更快';
+
+  @override
+  String get reasoningBudgetSheetSmartLabel => '更聪明';
+
+  @override
+  String get reasoningBudgetSheetHelpTooltip => '查看当前推理档位说明';
+
+  @override
+  String get reasoningBudgetSheetCustomShortLabel => '自定义';
+
+  @override
   String get reasoningBudgetSheetCustomLabel => '自定义推理预算';
 
   @override
@@ -12700,6 +12744,28 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get reasoningBudgetSheetXhighSubtitle => '使用最大推理深度，適合最複雜的問題';
+
+  @override
+  String get reasoningBudgetSheetMaxSubtitle => '使用最深可用推理，適合高風險或非常複雜的任務';
+
+  @override
+  String get reasoningBudgetSheetUltracode => 'Ultracode';
+
+  @override
+  String get reasoningBudgetSheetUltracodeSubtitle =>
+      '深度執行預設，適合複雜工程、長上下文與多步驗證任務';
+
+  @override
+  String get reasoningBudgetSheetFastLabel => '更快';
+
+  @override
+  String get reasoningBudgetSheetSmartLabel => '更聰明';
+
+  @override
+  String get reasoningBudgetSheetHelpTooltip => '查看目前推理檔位說明';
+
+  @override
+  String get reasoningBudgetSheetCustomShortLabel => '自訂';
 
   @override
   String get reasoningBudgetSheetCustomLabel => '自訂推理預算';

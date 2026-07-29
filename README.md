@@ -53,6 +53,13 @@ Create a world book from this setting document and use character and location na
 - `@kelivo/images`: image-oriented helper tools.
 - `@kelivo/github`: GitHub repository, file, issue, PR, release, Actions, secrets, and variables operations.
 
+### Mobile Reasoning Slider
+
+- Replaces the mobile reasoning bottom sheet with a compact slider-first control.
+- Keeps existing `thinkingBudget` storage and provider request mapping.
+- Adds the `Ultracode` visual preset for the highest available reasoning level, with right-to-left purple particle flow.
+- Keeps Off, Auto, and Custom as secondary actions below the slider.
+
 ### GitHub Write Tools
 
 The GitHub MCP server exposes grouped tools instead of one tool per API endpoint:
@@ -79,14 +86,14 @@ The wrapper layer also follows GitHub API constraints more strictly: empty repos
 
 Download links:
 
-- Latest Release page: [Kelivo Plus 1.1.17+4073](https://github.com/MuMu-0604/kelivo/releases/tag/v1.1.17-plus.4073)
-- Direct Android universal APK: [Kelivo_android_1.1.17+4073_gateway-report-fixes_fixedsign_universal.apk](https://github.com/MuMu-0604/kelivo/releases/download/v1.1.17-plus.4073/Kelivo_android_1.1.17%2B4073_gateway-report-fixes_fixedsign_universal.apk)
+- Latest Release page: [Kelivo Plus 1.1.17+9015](https://github.com/MuMu-0604/kelivo/releases/tag/v1.1.17-plus.9015)
+- Direct Android universal APK: [Kelivo_android_1.1.17+9015_reasoning-help-right-particles_coexist_fixedsign_universal.apk](https://github.com/MuMu-0604/kelivo/releases/download/v1.1.17-plus.9015/Kelivo_android_1.1.17%2B9015_reasoning-help-right-particles_coexist_fixedsign_universal.apk)
 
-The public APK keeps the Android package name `com.psyche.kelivo`, the same as upstream Kelivo, so Android treats it as the same app:
+The 1.1.17+9015 APK is a coexistence build that uses Android package name `com.psyche.kelivo.sliderpreview` and launcher label `Kelivo Slider`, so it can install beside upstream Kelivo instead of replacing it.
 
-- It cannot be installed over the official upstream Kelivo app unless the signing certificate matches, which it normally does not.
-- It cannot coexist with upstream Kelivo because Android only allows one installed app per package name.
-- It can update an older Kelivo Plus build only when the signing certificate is the same and the version code is not lower.
+- It has separate Android app data from the upstream `com.psyche.kelivo` package.
+- It can update older coexistence builds only when the signing certificate matches and the version code is not lower.
+- The default source build still uses `com.psyche.kelivo`; pass Gradle properties when building a coexistence variant.
 
 Recommended installation path:
 
@@ -95,14 +102,16 @@ Recommended installation path:
 3. Install the Kelivo Plus APK from Releases.
 4. Import backups or reconfigure providers, assistants, MCP, and GitHub Token.
 
-To coexist with upstream Kelivo, build a separate package-name variant:
+To build a coexistence variant from source, keep the same codebase and pass app identity overrides:
 
-1. Change Android `applicationId`, for example to `com.psyche.kelivo.plus`.
-2. Optionally change the app label to `Kelivo Plus` to avoid launcher confusion.
-3. Sign the APK with your own key.
-4. Treat it as a separate app with separate app data; migrate data through backup/import rather than direct private-data sharing.
+```powershell
+flutter build apk --release `
+  --dart-define=APP_FLAVOR=slider `
+  -PkelivoApplicationId=com.psyche.kelivo.sliderpreview `
+  -PkelivoAppLabel="Kelivo Slider"
+```
 
-The current Release APK is a same-package build, not a coexistence build.
+Treat coexistence builds as separate apps with separate app data; migrate data through backup/import rather than direct private-data sharing.
 
 ### Configure Models
 

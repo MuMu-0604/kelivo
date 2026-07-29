@@ -2008,6 +2008,30 @@ class AppLocalizationsEn extends AppLocalizations {
       'Use maximum reasoning depth for the toughest problems';
 
   @override
+  String get reasoningBudgetSheetMaxSubtitle =>
+      'Use the deepest available reasoning for high-stakes or very complex tasks';
+
+  @override
+  String get reasoningBudgetSheetUltracode => 'Ultracode';
+
+  @override
+  String get reasoningBudgetSheetUltracodeSubtitle =>
+      'Deep execution preset for complex engineering, long context, and multi-step verification tasks';
+
+  @override
+  String get reasoningBudgetSheetFastLabel => 'Faster';
+
+  @override
+  String get reasoningBudgetSheetSmartLabel => 'Smarter';
+
+  @override
+  String get reasoningBudgetSheetHelpTooltip =>
+      'Show current reasoning level details';
+
+  @override
+  String get reasoningBudgetSheetCustomShortLabel => 'Custom';
+
+  @override
   String get reasoningBudgetSheetCustomLabel => 'Custom Reasoning Budget';
 
   @override

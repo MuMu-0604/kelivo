@@ -3851,6 +3851,48 @@ abstract class AppLocalizations {
   /// **'Use maximum reasoning depth for the toughest problems'**
   String get reasoningBudgetSheetXhighSubtitle;
 
+  /// No description provided for @reasoningBudgetSheetMaxSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Use the deepest available reasoning for high-stakes or very complex tasks'**
+  String get reasoningBudgetSheetMaxSubtitle;
+
+  /// No description provided for @reasoningBudgetSheetUltracode.
+  ///
+  /// In en, this message translates to:
+  /// **'Ultracode'**
+  String get reasoningBudgetSheetUltracode;
+
+  /// No description provided for @reasoningBudgetSheetUltracodeSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Deep execution preset for complex engineering, long context, and multi-step verification tasks'**
+  String get reasoningBudgetSheetUltracodeSubtitle;
+
+  /// No description provided for @reasoningBudgetSheetFastLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Faster'**
+  String get reasoningBudgetSheetFastLabel;
+
+  /// No description provided for @reasoningBudgetSheetSmartLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Smarter'**
+  String get reasoningBudgetSheetSmartLabel;
+
+  /// No description provided for @reasoningBudgetSheetHelpTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Show current reasoning level details'**
+  String get reasoningBudgetSheetHelpTooltip;
+
+  /// No description provided for @reasoningBudgetSheetCustomShortLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom'**
+  String get reasoningBudgetSheetCustomShortLabel;
+
   /// No description provided for @reasoningBudgetSheetCustomLabel.
   ///
   /// In en, this message translates to:
