@@ -206,4 +206,3 @@ Kelivo Plus is a modified open-source build based on [Chevey339/kelivo](https://
 - It can be installed beside upstream Kelivo (`com.psyche.kelivo`) and keeps separate app data.
 - Release page: [v1.1.17-plus.9015](https://github.com/MuMu-0604/kelivo/releases/tag/v1.1.17-plus.9015)
 
-The full primary documentation is now maintained in Chinese first.
