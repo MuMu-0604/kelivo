@@ -1,5 +1,7 @@
 # Kelivo Plus
 
+简体中文 | [English](README_EN.md)
+
 Kelivo Plus 是基于 [Chevey339/kelivo](https://github.com/Chevey339/kelivo) 的二次开发版本。原版 Kelivo 是一个跨平台 Flutter LLM 聊天客户端，本版本在保留原有模型接入、聊天、多模态、MCP、搜索和桌面/移动端体验的基础上，重点增强了移动端 AI 自主配置、内置工具、技能系统、本地混合搜索和 GitHub 写入型 MCP 工具。
 
 > 二次开发声明：本仓库不是原作者官方仓库，代码基于原项目进行扩展与改造。原项目版权、协议与鸣谢请见原仓库和本仓库保留的 `LICENSE`。本项目继续遵循 AGPL-3.0 协议开源。
@@ -180,6 +182,7 @@ flutter build apk --release --target-platform android-arm64
 
 ## 文档
 
+- [English README](README_EN.md)
 - [二改功能说明](docs/KELIVO_PLUS_CHANGES_ZH.md)
 - [Android 安装与共存说明](docs/ANDROID_INSTALLATION_ZH.md)
 - [Release 说明](docs/RELEASE_NOTES_1.1.17_PLUS.md)
@@ -194,15 +197,4 @@ flutter build apk --release --target-platform android-arm64
 ## License
 
 本项目基于 AGPL-3.0 协议开源，详见 [LICENSE](LICENSE)。
-
----
-
-## English Summary
-
-Kelivo Plus is a modified open-source build based on [Chevey339/kelivo](https://github.com/Chevey339/kelivo). The latest `1.1.17+9015` Android APK is a coexistence build:
-
-- Package name: `com.psyche.kelivo.sliderpreview`
-- Launcher label: `Kelivo Slider`
-- It can be installed beside upstream Kelivo (`com.psyche.kelivo`) and keeps separate app data.
-- Release page: [v1.1.17-plus.9015](https://github.com/MuMu-0604/kelivo/releases/tag/v1.1.17-plus.9015)
 
