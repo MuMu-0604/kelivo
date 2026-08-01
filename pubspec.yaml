@@ -1,0 +1,225 @@
+name: Kelivo
+description: "An LLM chat client."
+# The following line prevents the package from being accidentally published to
+# pub.dev using `flutter pub publish`. This is preferred for private packages.
+publish_to: 'none' # Remove this line if you wish to publish to pub.dev
+
+# The following defines the version and build number for your application.
+# A version number is three numbers separated by dots, like 1.2.43
+# followed by an optional build number separated by a +.
+# Both the version and the builder number may be overridden in flutter
+# build by specifying --build-name and --build-number, respectively.
+# In Android, build-name is used as versionName while build-number used as versionCode.
+# Read more about Android versioning at https://developer.android.com/studio/publish/versioning
+# In iOS, build-name is used as CFBundleShortVersionString while build-number is used as CFBundleVersion.
+# Read more about iOS versioning at
+# https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
+# In Windows, build-name is used as the major, minor, and patch parts
+# of the product and file versions while build-number is used as the build suffix.
+version: 1.1.17+9015
+
+environment:
+  sdk: ^3.12.1
+  flutter: ">=3.44.1"
+
+# Dependencies specify other packages that your package needs in order to work.
+# To automatically upgrade your package dependencies to the latest versions
+# consider running `flutter pub upgrade --major-versions`. Alternatively,
+# dependencies can be manually updated by changing the version numbers below to
+# the latest version available on pub.dev. To see which dependencies have newer
+# versions available, run `flutter pub outdated`.
+dependencies:
+  flutter:
+    sdk: flutter
+  logging: ^1.2.0
+  # BitsDojo Window for Windows
+  bitsdojo_window: ^0.1.6
+  window_manager: ^0.5.1
+  screen_retriever: ^0.2.0
+  tray_manager:
+    path: ./dependencies/tray_manager/packages/tray_manager
+  desktop_drop: ^0.7.1
+  hotkey_manager: ^0.2.3
+
+  # Localizations for Chinese/English UI strings
+  flutter_localizations:
+    sdk: flutter
+  provider: ^6.0.5
+  dynamic_color: ^1.8.1
+  lucide_icons_flutter: ^3.1.13
+  shared_preferences: ^2.2.3
+  image_picker: 1.1.2
+  image_cropper: ^12.2.1
+  flutter_svg: ^2.2.1
+  http: ^1.5.0
+  crypto: ^3.0.3
+  dio: ^5.9.0
+  ddgs: ^0.3.2
+  socks5_proxy: ^2.1.1
+  jose: ^0.3.4
+  reorderable_grid_view: ^2.2.8
+  flutter_slidable: ^3.0.1
+  hive: ^2.2.3
+  hive_flutter: ^1.1.0
+  url_launcher: ^6.3.2
+  package_info_plus: ^8.3.1
+  gpt_markdown: #^1.1.7
+    path: ./dependencies/gpt_markdown
+  uuid: ^4.5.0
+  intl: ^0.20.2
+  path: ^1.9.1
+  path_provider: ^2.1.4
+  file_picker: ^10.3.10
+  archive: ^4.0.9
+  xml: ^6.5.0
+  yaml: ^3.1.3
+  open_filex: ^4.5.0
+  easy_image_viewer: ^1.4.6
+  share_plus: ^11.1.0
+  pretty_qr_code: ^3.5.0
+  mobile_scanner: ^7.0.1
+  mcp_client: # ^1.0.2
+    path: ./dependencies/mcp_client
+  flutter_highlight: ^0.7.0
+  highlight: ^0.7.0
+  syncfusion_flutter_core: ^31.2.5
+  syncfusion_flutter_sliders: ^31.2.5
+  syncfusion_flutter_pdf: ^31.2.5
+  audioplayers: ^6.5.1
+  html: ^0.15.6
+  html2md: ^1.2.10
+  http_parser: ^4.1.2
+  animations: ^2.0.11
+  flutter_animate: ^4.5.2
+  webview_flutter: ^4.13.1
+  webview_flutter_wkwebview: ^3.25.1
+  webview_windows: ^0.4.0
+  flutter_math_fork: ^0.7.4
+  scrollable_positioned_list: ^0.3.8
+  scrollview_observer: ^1.26.0
+  image_gallery_saver_plus: ^4.0.1
+  haptic_feedback: ^0.6.4+3
+  system_fonts: ^1.0.1
+  google_fonts: ^6.3.2
+  super_clipboard: ^0.9.1
+  permission_handler: ^12.0.3
+  flutter_tts:
+    path: ./dependencies/flutter_tts
+  flutter_background: ^1.3.0+1
+  flutter_local_notifications: ^17.2.3
+  image: ^4.8.0
+  math_expressions: ^2.6.2
+
+  # The following adds the Cupertino Icons font to your application.
+  # Use with the CupertinoIcons class for iOS style icons.
+  cupertino_icons: ^1.0.8
+  restart_app: ^1.8.3
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  build_runner: ^2.4.0
+  hive_generator: ^2.0.0
+  flutter_launcher_icons: ^0.14.4
+  flutter_native_splash: ^2.4.6
+
+  # The "flutter_lints" package below contains a set of recommended lints to
+  # encourage good coding practices. The lint set provided by the package is
+  # activated in the `analysis_options.yaml` file located at the root of your
+  # package. See that file for information about deactivating specific lint
+  # rules and activating additional ones.
+  flutter_lints: ^5.0.0
+
+dependency_overrides:
+  # Prevent the location from being accessed continuously on Windows
+  permission_handler_windows:
+    path: ./dependencies/flutter-permission-handler/permission_handler_windows
+
+hooks:
+  user_defines:
+    sqlite3:
+      source: system
+
+# For information on the generic Dart part of this file, see the
+# following page: https://dart.dev/tools/pub/pubspec
+
+# The following section is specific to Flutter packages.
+flutter:
+  generate: true
+
+  # The following line ensures that the Material Icons font is
+  # included with your application, so that you can use the icons in
+  # the material Icons class.
+  uses-material-design: true
+
+  # To add assets to your application, add an assets section, like this:
+  assets:
+    - assets/icons/
+    - assets/app_icon.png
+    - assets/app_icon.ico
+    - assets/icon_mac.png
+    - assets/mermaid.min.js
+    - assets/html/mark.html
+  #   - images/a_dot_ham.jpeg
+
+  # An image asset can refer to one or more resolution-specific "variants", see
+  # https://flutter.dev/to/resolution-aware-images
+
+  # For details regarding adding assets from package dependencies, see
+  # https://flutter.dev/to/asset-from-package
+
+  # To add custom fonts to your application, add a fonts section here,
+  # in this "flutter" section. Each entry in this list should have a
+  # "family" key with the font family name, and a "fonts" key with a
+  # list giving the asset and other descriptors for the font. For
+  # example:
+  # fonts:
+  #   - family: Schyler
+  #     fonts:
+  #       - asset: fonts/Schyler-Regular.ttf
+  #       - asset: fonts/Schyler-Italic.ttf
+  #         style: italic
+  #   - family: Trajan Pro
+  #     fonts:
+  #       - asset: fonts/TrajanPro.ttf
+  #       - asset: fonts/TrajanPro_Bold.ttf
+  #         weight: 700
+  #
+  # For details regarding fonts from package dependencies,
+  # see https://flutter.dev/to/font-from-package
+
+#  fonts:
+#    - family: JetBrainsMono
+#      fonts:
+#        - asset: assets/fonts/JetBrainsMono-Regular.ttf
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: assets/app_icon_foreground.png
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: assets/app_icon_foreground.png
+  remove_alpha_ios: true
+
+flutter_native_splash:
+  # Apply to both platforms
+  android: true
+  ios: true
+
+  # Background colors (fix iOS dark-mode white flash)
+  color: "#FFFFFF"
+  color_dark: "#000000"
+
+  # Center image (re-use app icon foreground)
+  image: assets/start.png
+  image_dark: assets/start.png
+
+  # iOS content mode to keep logo centered
+  ios_content_mode: center
+
+  # Android 12+ splash config (optional but keeps parity)
+  android_12:
+    color: "#FFFFFF"
+    color_dark: "#000000"
+    image: assets/start.png
+    image_dark: assets/start.png

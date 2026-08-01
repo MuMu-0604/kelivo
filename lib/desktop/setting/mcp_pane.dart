@@ -1,0 +1,887 @@
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+import '../../icons/lucide_adapter.dart' as lucide;
+import '../../l10n/app_localizations.dart';
+import '../../core/providers/mcp_provider.dart';
+import '../../shared/widgets/snackbar.dart';
+import 'mcp_edit_dialog.dart' show showDesktopMcpEditDialog;
+import 'mcp_json_edit_dialog.dart' show showDesktopMcpJsonEditDialog;
+import 'mcp_timeout_dialog.dart' show showDesktopMcpTimeoutDialog;
+import '../../theme/app_font_weights.dart';
+
+class DesktopMcpPane extends StatelessWidget {
+  const DesktopMcpPane({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final l10n = AppLocalizations.of(context)!;
+    final mcp = context.watch<McpProvider>();
+    final servers = mcp.servers;
+
+    return Container(
+      alignment: Alignment.topCenter,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 960),
+          child: CustomScrollView(
+            slivers: [
+              SliverToBoxAdapter(
+                child: SizedBox(
+                  height: 36,
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            l10n.mcpAssistantSheetTitle,
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: AppFontWeights.regular,
+                              color: cs.onSurface.withValues(alpha: 0.9),
+                            ),
+                          ),
+                        ),
+                      ),
+                      Tooltip(
+                        message: 'MCP 调用日志',
+                        child: _SmallIconBtn(
+                          icon: lucide.Lucide.History,
+                          onTap: () async {
+                            await _showCallLogs(context);
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Tooltip(
+                        message: l10n.mcpTimeoutSettingsTooltip,
+                        child: _SmallIconBtn(
+                          icon: lucide.Lucide.Timer,
+                          onTap: () async {
+                            await showDesktopMcpTimeoutDialog(context);
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      _SmallIconBtn(
+                        icon: lucide.Lucide.Edit,
+                        onTap: () async {
+                          await showDesktopMcpJsonEditDialog(context);
+                        },
+                      ),
+                      const SizedBox(width: 6),
+                      _SmallIconBtn(
+                        icon: lucide.Lucide.Plus,
+                        onTap: () async {
+                          await showDesktopMcpEditDialog(context);
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SliverToBoxAdapter(child: SizedBox(height: 8)),
+
+              if (servers.isEmpty)
+                SliverToBoxAdapter(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 40),
+                    alignment: Alignment.center,
+                    child: Text(
+                      l10n.mcpPageNoServers,
+                      style: TextStyle(
+                        color: cs.onSurface.withValues(alpha: 0.6),
+                      ),
+                    ),
+                  ),
+                )
+              else
+                SliverReorderableList(
+                  itemCount: servers.length,
+                  itemBuilder: (context, index) {
+                    final s = servers[index];
+                    final status = mcp.statusFor(s.id);
+                    final error = mcp.errorFor(s.id);
+                    return KeyedSubtree(
+                      key: ValueKey('desktop-mcp-${s.id}'),
+                      child: Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: ReorderableDragStartListener(
+                          index: index,
+                          child: _ServerCard(
+                            name: s.name,
+                            enabled: s.enabled,
+                            transport: s.transport,
+                            toolsEnabled: s.tools
+                                .where((t) => t.enabled)
+                                .length,
+                            toolsTotal: s.tools.length,
+                            status: status,
+                            showError:
+                                status == McpStatus.error &&
+                                (error?.isNotEmpty ?? false),
+                            onTap: () async {
+                              await showDesktopMcpEditDialog(
+                                context,
+                                serverId: s.id,
+                              );
+                            },
+                            onReconnect: () async {
+                              await context.read<McpProvider>().reconnect(s.id);
+                            },
+                            onDelete: () async {
+                              final mcpProvider = context.read<McpProvider>();
+                              final ok = await _confirmDelete(context);
+                              if (ok == true) {
+                                await mcpProvider.removeServer(s.id);
+                                if (context.mounted) {
+                                  showAppSnackBar(
+                                    context,
+                                    message: l10n.mcpPageServerDeleted,
+                                  );
+                                }
+                              }
+                            },
+                            onDetails: () async {
+                              await _showErrorDetails(
+                                context,
+                                name: s.name,
+                                message: error,
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                  onReorderItem: (oldIndex, newIndex) async {
+                    await context.read<McpProvider>().reorderServers(
+                      oldIndex,
+                      newIndex,
+                    );
+                  },
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ServerCard extends StatefulWidget {
+  const _ServerCard({
+    required this.name,
+    required this.enabled,
+    required this.transport,
+    required this.toolsEnabled,
+    required this.toolsTotal,
+    required this.status,
+    required this.onTap,
+    required this.onReconnect,
+    required this.onDelete,
+    required this.onDetails,
+    required this.showError,
+  });
+  final String name;
+  final bool enabled;
+  final McpTransportType transport;
+  final int toolsEnabled;
+  final int toolsTotal;
+  final McpStatus status;
+  final VoidCallback onTap;
+  final VoidCallback onReconnect;
+  final VoidCallback onDelete;
+  final VoidCallback onDetails;
+  final bool showError;
+
+  @override
+  State<_ServerCard> createState() => _ServerCardState();
+}
+
+class _ServerCardState extends State<_ServerCard> {
+  bool _hover = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final l10n = AppLocalizations.of(context)!;
+
+    final baseBg = isDark
+        ? Colors.white10
+        : Colors.white.withValues(alpha: 0.96);
+    final borderColor = _hover
+        ? cs.primary.withValues(alpha: isDark ? 0.35 : 0.45)
+        : cs.outlineVariant.withValues(alpha: isDark ? 0.12 : 0.08);
+
+    Color statusColor;
+    String statusText;
+    switch (widget.status) {
+      case McpStatus.connected:
+        statusColor = Colors.green;
+        statusText = l10n.mcpPageStatusConnected;
+        break;
+      case McpStatus.connecting:
+        statusColor = cs.primary;
+        statusText = l10n.mcpPageStatusConnecting;
+        break;
+      case McpStatus.error:
+      case McpStatus.idle:
+        statusColor = Colors.redAccent;
+        statusText = l10n.mcpPageStatusDisconnected;
+        break;
+    }
+
+    Widget tag(String text, {Color? color}) {
+      final c = color ?? cs.primary;
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+        decoration: BoxDecoration(
+          color: c.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: c.withValues(alpha: 0.35)),
+        ),
+        child: Text(
+          text,
+          style: TextStyle(
+            fontSize: 11,
+            color: c,
+            fontWeight: AppFontWeights.emphasis,
+          ),
+        ),
+      );
+    }
+
+    String transportText;
+    switch (widget.transport) {
+      case McpTransportType.sse:
+        transportText = 'SSE';
+        break;
+      case McpTransportType.http:
+        transportText = 'HTTP';
+        break;
+      case McpTransportType.stdio:
+        transportText = AppLocalizations.of(context)!.mcpTransportTagStdio;
+        break;
+      case McpTransportType.inmemory:
+        transportText = AppLocalizations.of(context)!.mcpTransportTagInmemory;
+        break;
+    }
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hover = true),
+      onExit: (_) => setState(() => _hover = false),
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: Container(
+          decoration: BoxDecoration(
+            color: baseBg,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: borderColor, width: 1.0),
+          ),
+          padding: const EdgeInsets.all(14),
+          constraints: const BoxConstraints(minHeight: 64),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: isDark ? Colors.white10 : const Color(0xFFF2F3F5),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    alignment: Alignment.center,
+                    child: Icon(
+                      lucide.Lucide.Terminal,
+                      size: 18,
+                      color: cs.primary,
+                    ),
+                  ),
+                  Positioned(
+                    right: -2,
+                    bottom: -2,
+                    child: widget.status == McpStatus.connecting
+                        ? SizedBox(
+                            width: 12,
+                            height: 12,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                cs.primary,
+                              ),
+                            ),
+                          )
+                        : Container(
+                            width: 12,
+                            height: 12,
+                            decoration: BoxDecoration(
+                              color: widget.enabled ? statusColor : cs.outline,
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: Theme.of(
+                                  context,
+                                ).scaffoldBackgroundColor,
+                                width: 1.5,
+                              ),
+                            ),
+                          ),
+                  ),
+                ],
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      widget.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: AppFontWeights.emphasis,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: [
+                        tag(statusText, color: statusColor),
+                        tag(transportText),
+                        tag(
+                          AppLocalizations.of(context)!.mcpPageToolsCount(
+                            widget.toolsEnabled,
+                            widget.toolsTotal,
+                          ),
+                        ),
+                        if (!widget.enabled)
+                          tag(
+                            l10n.mcpPageStatusDisabled,
+                            color: cs.onSurface.withValues(alpha: 0.7),
+                          ),
+                      ],
+                    ),
+                    if (widget.showError) ...[
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Icon(
+                            lucide.Lucide.MessageCircleWarning,
+                            size: 14,
+                            color: Colors.red,
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              l10n.mcpPageConnectionFailed,
+                              style: TextStyle(fontSize: 12, color: Colors.red),
+                            ),
+                          ),
+                          TextButton(
+                            onPressed: widget.onDetails,
+                            style: ButtonStyle(
+                              splashFactory: NoSplash.splashFactory,
+                              overlayColor: const WidgetStatePropertyAll(
+                                Colors.transparent,
+                              ),
+                            ),
+                            child: Text(l10n.mcpPageDetails),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              _SmallIconBtn(icon: lucide.Lucide.Settings2, onTap: widget.onTap),
+              const SizedBox(width: 6),
+              _SmallIconBtn(
+                icon: lucide.Lucide.RefreshCw,
+                onTap: widget.onReconnect,
+              ),
+              const SizedBox(width: 6),
+              _SmallIconBtn(icon: lucide.Lucide.Trash2, onTap: widget.onDelete),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SmallIconBtn extends StatefulWidget {
+  const _SmallIconBtn({required this.icon, required this.onTap});
+  final IconData icon;
+  final VoidCallback onTap;
+  @override
+  State<_SmallIconBtn> createState() => _SmallIconBtnState();
+}
+
+class _SmallIconBtnState extends State<_SmallIconBtn> {
+  bool _hover = false;
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = _hover
+        ? (isDark
+              ? Colors.white.withValues(alpha: 0.06)
+              : Colors.black.withValues(alpha: 0.05))
+        : Colors.transparent;
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hover = true),
+      onExit: (_) => setState(() => _hover = false),
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: Container(
+          width: 28,
+          height: 28,
+          decoration: BoxDecoration(
+            color: bg,
+            borderRadius: BorderRadius.circular(6),
+          ),
+          alignment: Alignment.center,
+          child: Icon(widget.icon, size: 18, color: cs.onSurface),
+        ),
+      ),
+    );
+  }
+}
+
+Future<void> _showErrorDetails(
+  BuildContext context, {
+  required String name,
+  String? message,
+}) async {
+  final cs = Theme.of(context).colorScheme;
+  final l10n = AppLocalizations.of(context)!;
+  await showDialog<void>(
+    context: context,
+    barrierDismissible: true,
+    builder: (ctx) {
+      return Dialog(
+        backgroundColor: cs.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 640),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            l10n.mcpPageErrorDialogTitle,
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: AppFontWeights.emphasis,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            name,
+                            style: TextStyle(
+                              color: cs.onSurface.withValues(alpha: 0.7),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    _SmallIconBtn(
+                      icon: lucide.Lucide.X,
+                      onTap: () => Navigator.of(ctx).maybePop(),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? Colors.white10
+                        : const Color(0xFFF7F7F9),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: cs.outlineVariant.withValues(alpha: 0.2),
+                    ),
+                  ),
+                  child: SingleChildScrollView(
+                    child: SelectableText(
+                      (message?.isNotEmpty == true
+                          ? message!
+                          : l10n.mcpPageErrorNoDetails),
+                      style: (Theme.of(ctx).textTheme.bodyMedium ?? TextStyle())
+                          .copyWith(fontSize: 13.0, height: 1.35),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: FilledButton(
+                    onPressed: () => Navigator.of(ctx).maybePop(),
+                    style: FilledButton.styleFrom(
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: Text(l10n.mcpPageClose),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    },
+  );
+}
+
+Future<void> _showCallLogs(BuildContext context) async {
+  final cs = Theme.of(context).colorScheme;
+  await showDialog<void>(
+    context: context,
+    barrierDismissible: true,
+    builder: (ctx) {
+      return Dialog(
+        backgroundColor: cs.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 760, maxHeight: 720),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+            child: Consumer<McpProvider>(
+              builder: (context, mcp, _) {
+                final logs = mcp.callLogs;
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'MCP 调用日志',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: AppFontWeights.emphasis,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                '仅保留最近 ${logs.length} 条内存日志',
+                                style: TextStyle(
+                                  color: cs.onSurface.withValues(alpha: 0.62),
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (logs.isNotEmpty)
+                          TextButton(
+                            onPressed: mcp.clearCallLogs,
+                            child: const Text('清空'),
+                          ),
+                        const SizedBox(width: 6),
+                        _SmallIconBtn(
+                          icon: lucide.Lucide.X,
+                          onTap: () => Navigator.of(ctx).maybePop(),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Expanded(
+                      child: logs.isEmpty
+                          ? Center(
+                              child: Text(
+                                '暂无调用记录',
+                                style: TextStyle(
+                                  color: cs.onSurface.withValues(alpha: 0.58),
+                                ),
+                              ),
+                            )
+                          : ListView.separated(
+                              itemCount: logs.length,
+                              separatorBuilder: (_, __) =>
+                                  const SizedBox(height: 10),
+                              itemBuilder: (context, index) =>
+                                  _DesktopMcpCallLogCard(entry: logs[index]),
+                            ),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+        ),
+      );
+    },
+  );
+}
+
+class _DesktopMcpCallLogCard extends StatelessWidget {
+  const _DesktopMcpCallLogCard({required this.entry});
+
+  final McpCallLogEntry entry;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final statusColor = switch (entry.status) {
+      McpCallLogStatus.success => Colors.green,
+      McpCallLogStatus.error => Colors.redAccent,
+      McpCallLogStatus.running => cs.primary,
+    };
+    final statusText = switch (entry.status) {
+      McpCallLogStatus.success => '成功',
+      McpCallLogStatus.error => '失败',
+      McpCallLogStatus.running => '运行中',
+    };
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? Colors.white10 : const Color(0xFFF9FAFB),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.16)),
+      ),
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                entry.status == McpCallLogStatus.error
+                    ? lucide.Lucide.MessageCircleWarning
+                    : lucide.Lucide.Activity,
+                size: 18,
+                color: statusColor,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  entry.toolName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontWeight: AppFontWeights.emphasis),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                statusText,
+                style: TextStyle(
+                  color: statusColor,
+                  fontWeight: AppFontWeights.emphasis,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            '${entry.serverName} · ${_formatLogTime(entry.startedAt)}${entry.durationMs == null ? '' : ' · ${entry.durationMs}ms'}${entry.retried ? ' · 已重试' : ''}',
+            style: TextStyle(
+              color: cs.onSurface.withValues(alpha: 0.58),
+              fontSize: 12,
+            ),
+          ),
+          const SizedBox(height: 10),
+          _DesktopLogPreviewBlock(title: '参数', text: entry.argumentsPreview),
+          if ((entry.error ?? '').isNotEmpty) ...[
+            const SizedBox(height: 8),
+            _DesktopLogPreviewBlock(title: '错误', text: entry.error!),
+          ] else if ((entry.resultPreview ?? '').isNotEmpty) ...[
+            const SizedBox(height: 8),
+            _DesktopLogPreviewBlock(title: '结果', text: entry.resultPreview!),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _DesktopLogPreviewBlock extends StatelessWidget {
+  const _DesktopLogPreviewBlock({required this.title, required this.text});
+
+  final String title;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: isDark ? Colors.black12 : Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.18)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 11,
+              color: cs.onSurface.withValues(alpha: 0.54),
+              fontWeight: AppFontWeights.emphasis,
+            ),
+          ),
+          const SizedBox(height: 4),
+          SelectableText(
+            text,
+            maxLines: 8,
+            style: TextStyle(
+              fontSize: 12,
+              height: 1.35,
+              color: cs.onSurface.withValues(alpha: 0.82),
+              fontFamily: 'monospace',
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+String _formatLogTime(DateTime dt) {
+  String two(int value) => value.toString().padLeft(2, '0');
+  return '${two(dt.hour)}:${two(dt.minute)}:${two(dt.second)}';
+}
+
+Future<bool?> _confirmDelete(BuildContext context) async {
+  final l10n = AppLocalizations.of(context)!;
+  final cs = Theme.of(context).colorScheme;
+  return showDialog<bool>(
+    context: context,
+    barrierDismissible: true,
+    builder: (ctx) {
+      return Dialog(
+        backgroundColor: cs.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 360),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  l10n.mcpPageConfirmDeleteTitle,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: AppFontWeights.emphasis,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  l10n.mcpPageConfirmDeleteContent,
+                  style: TextStyle(color: cs.onSurface.withValues(alpha: 0.8)),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    Builder(
+                      builder: (context) {
+                        final isDark =
+                            Theme.of(context).brightness == Brightness.dark;
+                        return TextButton(
+                          onPressed: () => Navigator.of(ctx).pop(false),
+                          style: ButtonStyle(
+                            splashFactory: NoSplash.splashFactory,
+                            overlayColor: const WidgetStatePropertyAll(
+                              Colors.transparent,
+                            ),
+                            minimumSize: const WidgetStatePropertyAll(
+                              Size(88, 36),
+                            ),
+                            shape: WidgetStatePropertyAll(
+                              RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                            backgroundColor: WidgetStateProperty.resolveWith((
+                              states,
+                            ) {
+                              if (states.contains(WidgetState.hovered)) {
+                                return isDark
+                                    ? Colors.white.withValues(alpha: 0.06)
+                                    : Colors.black.withValues(alpha: 0.05);
+                              }
+                              return Colors.transparent;
+                            }),
+                          ),
+                          child: Text(l10n.mcpPageCancel),
+                        );
+                      },
+                    ),
+                    const SizedBox(width: 8),
+                    FilledButton(
+                      style:
+                          FilledButton.styleFrom(
+                            backgroundColor: cs.error,
+                            foregroundColor: cs.onError,
+                          ).copyWith(
+                            splashFactory: NoSplash.splashFactory,
+                            overlayColor: const WidgetStatePropertyAll(
+                              Colors.transparent,
+                            ),
+                            minimumSize: const WidgetStatePropertyAll(
+                              Size(88, 36),
+                            ),
+                            shape: WidgetStatePropertyAll(
+                              RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                            backgroundColor: WidgetStateProperty.resolveWith((
+                              states,
+                            ) {
+                              if (states.contains(WidgetState.hovered)) {
+                                return Color.lerp(cs.error, Colors.white, 0.08);
+                              }
+                              return cs.error;
+                            }),
+                          ),
+                      onPressed: () => Navigator.of(ctx).pop(true),
+                      child: Text(l10n.mcpPageDelete),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    },
+  );
+}

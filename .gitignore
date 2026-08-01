@@ -1,0 +1,83 @@
+# Miscellaneous
+*.class
+*.log
+*.pyc
+*.swp
+.DS_Store
+.atom/
+.build/
+.claude/
+.buildlog/
+.history
+.svn/
+.swiftpm/
+migrate_working_dir/
+WORKSPACE_CURRENT.md
+
+# Local build/runtime caches and release artifacts kept out of source control
+.android-build-cache/
+.gradle-home/
+.gradle-java-tmp/
+android-sdk-ascii/
+*.apk
+*.aab
+
+# IntelliJ related
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# The .vscode folder contains launch configuration and tasks you configure in
+# VS Code which you may wish to be included in version control, so this line
+# is commented out by default.
+#.vscode/
+
+# Flutter/Dart/Pub related
+**/doc/api/
+**/ios/Flutter/.last_build_id
+.dart_tool/
+**/.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+/build/
+/android/.gradle/
+/android/.kotlin/
+/android/build/
+/ios/build/
+/android/local.properties
+/android/key.properties
+
+# Symbolication related
+app.*.symbols
+
+# Obfuscation related
+app.*.map.json
+
+# Android Studio will place build artifacts here
+/android/app/debug
+/android/app/profile
+/android/app/release
+
+# Flutter application lockfile should be versioned. If it is currently untracked,
+# add it deliberately after dependency state is verified.
+!pubspec.lock
+/linux/flutter/generated_plugin_registrant.cc
+/windows/flutter/generated_plugin_registrant.cc
+/linux/flutter/generated_plugin_registrant.h
+/windows/flutter/generated_plugin_registrant.h
+/linux/flutter/generated_plugins.cmake
+/windows/flutter/generated_plugins.cmake
+/macos/flutter/GeneratedPluginRegistrant.swift
+
+internationalization.md
+/macos/Podfile.lock
+/desiredFileName.txt
+/lib/secrets/fallback.dart
+.claude/settings.local.json
+/.codex/
+/.agent/
+/.agents/
+/skills-lock.json
