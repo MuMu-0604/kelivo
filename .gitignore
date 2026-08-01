@@ -14,7 +14,7 @@
 migrate_working_dir/
 WORKSPACE_CURRENT.md
 
-# Local build/runtime caches kept out of source control
+# Local build/runtime caches and release artifacts kept out of source control
 .android-build-cache/
 .gradle-home/
 .gradle-java-tmp/

@@ -1,65 +1,55 @@
-# Kelivo Plus 1.1.17+4073 Release Notes
+# Kelivo Plus 1.1.17+9015 Release Notes
 
-发布日期：2026-07-26
+发布日期：2026-07-29
 
-本版本是基于 [Chevey339/kelivo](https://github.com/Chevey339/kelivo) 的二次开发公开版本，重点整合神经权能网关、Skills、内置 MCP、GitHub 写入工具、本地混合搜索和 Android 移动端导入增强。
+本版本是基于 [Chevey339/kelivo](https://github.com/Chevey339/kelivo) 的二次开发公开版本，源代码版本号为 `1.1.17+9015`。本次发布重点补齐移动端推理强度滑块、共存安装包构建参数、9015 APK 发布说明，并保留此前整合的神经权能网关、Skills、内置 MCP、GitHub 写入工具和本地混合搜索能力。
 
 ## 下载
 
-Release 资产包含最新版 Android 通用 APK：
+Release 资产包含 9015 Android 通用共存 APK：
 
 ```text
-Kelivo_android_1.1.17+4073_gateway-report-fixes_fixedsign_universal.apk
+Kelivo_android_1.1.17+9015_reasoning-help-right-particles_coexist_fixedsign_universal.apk
 ```
 
 SHA256：
 
 ```text
-B3258E39ED6CBC2546AA7FB916A5F72D2911522C67916F3F84C3538610990640
+883FEA1DB7A2465569D7D56093A4A1D028DEB3C001DE73A5CEF51E6D4F775285
 ```
 
-## 重要变更
+## 9015 重点变化
 
-- 新增神经权能网关：允许授权助手在对话中导入、编辑和撤销 App 配置，并替代旧的 App Control Agent 可见命名。
-- 扩展神经权能网关：补齐删除、更新、列表/详情、世界书 entry 细粒度编辑、快捷短语排序、技能版本快照/回滚、批量 JSON 导入导出和操作审计。
-- 新增助手级高权限开关：默认关闭，用户可按助手授予配置控制能力。
-- 新增 Skills 系统：支持创建、导入、触发词匹配和助手绑定。
-- 新增内置 MCP 服务：Files、Images、GitHub，并保留 Fetch。
-- 升级 GitHub MCP：支持仓库、文件、Issue、PR、Release、Actions、Secrets、Variables 等写入和管理能力。
-- 优化 GitHub 工具封装：按业务分组，中文工具说明，参数按 GitHub API 规则收敛。
-- 新增 Local Hybrid Search：无需 API Key，聚合多个本地搜索源并进行过滤、去重、排序。
-- 增强 Android 分享导入：支持文本和多类型文件进入对话，再由助手导入到目标配置。
-- 修复 GitHub PR review inline comment：新建 inline comment 不再要求或发送 `in_reply_to`；只有回复已有 review comment 时才发送 `body` 和 `in_reply_to`。
-- 明确写入验证策略：新建/更新文件后不使用 GitHub code search 做强一致验证，应使用 `get_file`、`list_directory`、`get_commit` 或 `compare_refs`。
+- 新增移动端推理强度滑块的共存构建支持。
+- 9015 APK 使用独立 Android 包名 `com.psyche.kelivo.sliderpreview`。
+- 启动器显示名称为 `Kelivo Slider`，可与原版 Kelivo 同时安装。
+- 保留默认源码包名 `com.psyche.kelivo`；只有传入 Gradle 参数时才生成共存包。
+- README 已更新为 9015 下载地址和共存安装说明。
 
-## GitHub 工具修复
+## 已继承能力
 
-- 空仓库创建分支前自动初始化 README。
-- `GITHUB_` 变量名前缀提前报错并提示替代前缀。
-- 写入后不使用 code search 作为强一致验证。
-- PR update 使用最小 payload，避免无关字段导致 422。
-- PR 行内评论与回复评论拆分为不同路径。
-- 支持多行评论和 file-level comment 常用字段。
+- 神经权能网关：允许授权助手在对话中导入、编辑和撤销 App 配置。
+- Skills 系统：支持创建、导入、触发词匹配和助手绑定。
+- 内置 MCP 服务：Fetch、Files、Images、GitHub 等内置工具继续可用。
+- GitHub 写入工具：支持仓库、文件、Issue、PR、Release、Actions、Secrets、Variables 等能力。
+- Local Hybrid Search：无需 API Key，聚合多源本地搜索并进行过滤、去重和排序。
+- Android 分享导入：支持文本和多类型文件进入对话，再由助手导入到目标配置。
 
-## 升级提示
+## 安装与共存
 
-- 本 Release APK 的包名是 `com.psyche.kelivo`，与原版 Kelivo 相同。
-- 不能直接覆盖安装原版 Kelivo：原版和二改版通常签名不同，Android 会报签名冲突。
-- 不能与原版 Kelivo 直接共存：同一包名在同一设备上只能安装一个应用。
-- 推荐先备份/导出原版数据，卸载原版，再安装 Kelivo Plus。
-- 如需共存，请自行构建独立包名版本，例如把 Android `applicationId` 改为 `com.psyche.kelivo.plus`，并用自己的签名打包；共存版拥有独立应用数据，需要通过备份/导入迁移。
-- 覆盖安装旧 Kelivo Plus 二改版要求 APK 签名与已安装版本一致。
-- 如果 Android 提示“无法降级”，请确认当前已安装版本号是否高于 `1.1.17+4073`。
-- GitHub Token 不会随应用内置，需要在 MCP 编辑页自行配置。
-- 神经权能网关是高权限能力，仅建议对可信助手开启。
+- 9015 共存 APK 不会覆盖原版 Kelivo。
+- 原版包名仍是 `com.psyche.kelivo`，9015 共存包名是 `com.psyche.kelivo.sliderpreview`。
+- 共存包与原版 Kelivo 使用独立应用数据，不会直接读取原版私有数据。
+- 如需迁移配置、聊天记录、助手、MCP 或模型设置，请通过备份/导入完成。
+
+共存构建示例：
+
+```powershell
+flutter build apk --release `
+  -PkelivoApplicationId=com.psyche.kelivo.sliderpreview `
+  -PkelivoAppLabel="Kelivo Slider"
+```
 
 ## 验证
 
-已针对本版本相关模块运行重点测试：
-
-```powershell
-flutter analyze lib\core\services\mcp\kelivo_github\github_api_client.dart lib\core\services\mcp\kelivo_github\kelivo_github_server.dart test\kelivo_github_mcp_server_test.dart lib\core\providers\mcp_provider.dart
-flutter test test\core\providers\mcp_provider_builtin_test.dart test\kelivo_github_mcp_server_test.dart
-```
-
-历史整合测试还覆盖 Skills、Files、Images、本地混合搜索和神经权能网关相关模块。完整 `flutter analyze` 可能受 vendored `dependencies/mcp_client/test` 上下文影响，需要单独处理 analyzer exclude 后再执行。
+9015 发布前已围绕移动端推理滑块、MCP、备份同步、模型兼容和聊天输入相关路径进行针对性验证。完整 `flutter analyze` 仍可能受到 vendored `dependencies/mcp_client/test` 上下文影响，建议继续使用项目说明中的 targeted tests 作为日常验证基线。
