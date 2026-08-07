@@ -17,6 +17,7 @@ class AssistantProvider extends ChangeNotifier {
   static const String _assistantsKey = 'assistants_v1';
   static const String _currentAssistantKey = 'current_assistant_id_v1';
   static const String _legacySearchEnabledKey = 'search_enabled_v1';
+  static const String _legacyOcrEnabledKey = 'ocr_enabled_v1';
 
   final List<Assistant> _assistants = <Assistant>[];
   String? _currentAssistantId;
@@ -42,17 +43,20 @@ class AssistantProvider extends ChangeNotifier {
     final raw = prefs.getString(_assistantsKey);
     if (raw != null && raw.isNotEmpty) {
       final legacySearchEnabled = prefs.getBool(_legacySearchEnabledKey);
-      final migrated = _decodeAssistantsWithLegacySearch(
+      final legacyOcrEnabled = prefs.getBool(_legacyOcrEnabledKey);
+      final migrated = _decodeAssistantsWithLegacySettings(
         raw,
         legacySearchEnabled: legacySearchEnabled,
+        legacyOcrEnabled: legacyOcrEnabled,
       );
-      bool migratedSearchEnabled = false;
+      bool migratedLegacySettings = false;
       _assistants
         ..clear()
         ..addAll(migrated.assistants);
-      migratedSearchEnabled = migrated.didApplyLegacySearch;
+      migratedLegacySettings =
+          migrated.didApplyLegacySearch || migrated.didApplyLegacyOcr;
       // Fix any sandboxed local paths (avatars/backgrounds) imported from other platforms
-      bool changed = migratedSearchEnabled;
+      bool changed = migratedLegacySettings;
       for (int i = 0; i < _assistants.length; i++) {
         final a = _assistants[i];
         String? av = a.avatar;
@@ -84,6 +88,9 @@ class AssistantProvider extends ChangeNotifier {
       if (changed) {
         try {
           await _persist();
+          if (migrated.didApplyLegacyOcr) {
+            await prefs.remove(_legacyOcrEnabledKey);
+          }
         } catch (_) {}
       }
     }
@@ -99,13 +106,15 @@ class AssistantProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  _AssistantDecodeResult _decodeAssistantsWithLegacySearch(
+  _AssistantDecodeResult _decodeAssistantsWithLegacySettings(
     String raw, {
     required bool? legacySearchEnabled,
+    required bool? legacyOcrEnabled,
   }) {
     try {
       final decoded = jsonDecode(raw) as List<dynamic>;
       bool didApplyLegacySearch = false;
+      bool didApplyLegacyOcr = false;
       final assistants = [
         for (final e in decoded)
           if (e is Map)
@@ -116,17 +125,25 @@ class AssistantProvider extends ChangeNotifier {
                 json['searchEnabled'] = legacySearchEnabled;
                 didApplyLegacySearch = true;
               }
+              if (legacyOcrEnabled != null && !json.containsKey('ocrMode')) {
+                json['ocrMode'] = legacyOcrEnabled
+                    ? Assistant.ocrModeAuto
+                    : Assistant.ocrModeNever;
+                didApplyLegacyOcr = true;
+              }
               return Assistant.fromJson(json);
             })(),
       ];
       return _AssistantDecodeResult(
         assistants: assistants,
         didApplyLegacySearch: didApplyLegacySearch,
+        didApplyLegacyOcr: didApplyLegacyOcr,
       );
     } catch (_) {
       return const _AssistantDecodeResult(
         assistants: <Assistant>[],
         didApplyLegacySearch: false,
+        didApplyLegacyOcr: false,
       );
     }
   }
@@ -581,8 +598,10 @@ class _AssistantDecodeResult {
   const _AssistantDecodeResult({
     required this.assistants,
     required this.didApplyLegacySearch,
+    required this.didApplyLegacyOcr,
   });
 
   final List<Assistant> assistants;
   final bool didApplyLegacySearch;
+  final bool didApplyLegacyOcr;
 }

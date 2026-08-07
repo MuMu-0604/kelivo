@@ -2002,5 +2002,18 @@
   "skillsDescriptionLabel": "描述",
   "skillsTriggerKeywordsLabel": "触发关键词",
   "skillsTriggerKeywordsHint": "代码审查、DCF、润色",
-  "skillsContentHint": "在这里粘贴技能指令。"
+  "skillsContentHint": "在这里粘贴技能指令。",
+  "documentProcessingTitle": "文档处理",
+  "documentProcessingNoAssistant": "未选择助手。",
+  "documentProcessingImageOcr": "图片 OCR",
+  "documentProcessingOcrAuto": "智能识别",
+  "documentProcessingOcrAlways": "总是 OCR",
+  "documentProcessingOcrNever": "永不 OCR",
+  "documentProcessingOcrModelMissing": "请先选择 OCR 模型，再启用 OCR 模式。",
+  "documentProcessingDocx": "DOCX 文件",
+  "documentProcessingPdf": "PDF 文件",
+  "documentProcessingOtherOffice": "其他 Office 文件",
+  "documentProcessingModeExtract": "提取文本",
+  "documentProcessingModeDirect": "直接发送文件",
+  "documentProcessingModeDiscard": "忽略文件"
 }

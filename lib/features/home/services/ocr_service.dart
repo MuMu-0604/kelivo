@@ -69,7 +69,7 @@ class OcrService {
       config: cfg,
       modelId: model,
       messages: messages,
-      userImagePaths: imagePaths,
+      userMediaPaths: imagePaths,
       thinkingBudget: null,
       temperature: 0.0,
       topP: null,
@@ -143,9 +143,7 @@ class OcrService {
     if (imagePaths.isEmpty) return null;
 
     final settings = context.read<SettingsProvider>();
-    if (!(settings.ocrEnabled &&
-        settings.ocrModelProvider != null &&
-        settings.ocrModelId != null)) {
+    if (settings.ocrModelProvider == null || settings.ocrModelId == null) {
       return null;
     }
 

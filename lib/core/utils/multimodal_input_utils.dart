@@ -8,6 +8,24 @@ bool isAudioMime(String mime) => mime.toLowerCase().startsWith('audio/');
 
 bool isVideoMime(String mime) => mime.toLowerCase().startsWith('video/');
 
+bool isPdfMime(String mime) => mime.toLowerCase() == 'application/pdf';
+
+const List<String> _officeMimePrefixes = <String>[
+  'application/vnd.openxmlformats-officedocument',
+  'application/vnd.ms-',
+  'application/msword',
+  'application/rtf',
+];
+
+bool isOfficeDocumentMime(String mime) {
+  final lower = mime.toLowerCase();
+  return _officeMimePrefixes.any(lower.startsWith);
+}
+
+bool isDirectUploadDocumentMime(String mime) {
+  return isPdfMime(mime) || isOfficeDocumentMime(mime);
+}
+
 bool isLongCatOmniModelId(String upstreamModelId) {
   final normalized = upstreamModelId.trim().toLowerCase();
   return normalized.startsWith('longcat-flash-omni') ||
@@ -42,6 +60,19 @@ String inferMediaMimeFromSource(String source, {String fallbackMime = ''}) {
   if (lower.endsWith('.wmv')) return 'video/x-ms-wmv';
   if (lower.endsWith('.webm')) return 'video/webm';
   if (lower.endsWith('.3gp') || lower.endsWith('.3gpp')) return 'video/3gpp';
+  if (lower.endsWith('.pdf')) return 'application/pdf';
+  if (lower.endsWith('.docx')) {
+    return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+  }
+  if (lower.endsWith('.pptx')) {
+    return 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
+  }
+  if (lower.endsWith('.xlsx')) {
+    return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+  }
+  if (lower.endsWith('.doc')) return 'application/msword';
+  if (lower.endsWith('.ppt')) return 'application/vnd.ms-powerpoint';
+  if (lower.endsWith('.xls')) return 'application/vnd.ms-excel';
   return fallbackMime;
 }
 
@@ -53,7 +84,8 @@ String resolveMediaAttachmentMime({
   final normalizedExplicit = explicitMime.trim().toLowerCase();
   if (isImageMime(normalizedExplicit) ||
       isAudioMime(normalizedExplicit) ||
-      isVideoMime(normalizedExplicit)) {
+      isVideoMime(normalizedExplicit) ||
+      isDirectUploadDocumentMime(normalizedExplicit)) {
     return normalizedExplicit;
   }
 

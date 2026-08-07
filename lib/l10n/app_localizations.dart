@@ -10345,6 +10345,84 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Paste skill instructions here.'**
   String get skillsContentHint;
+
+  /// No description provided for @documentProcessingTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Document processing'**
+  String get documentProcessingTitle;
+
+  /// No description provided for @documentProcessingNoAssistant.
+  ///
+  /// In en, this message translates to:
+  /// **'No assistant selected.'**
+  String get documentProcessingNoAssistant;
+
+  /// No description provided for @documentProcessingImageOcr.
+  ///
+  /// In en, this message translates to:
+  /// **'Image OCR'**
+  String get documentProcessingImageOcr;
+
+  /// No description provided for @documentProcessingOcrAuto.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto'**
+  String get documentProcessingOcrAuto;
+
+  /// No description provided for @documentProcessingOcrAlways.
+  ///
+  /// In en, this message translates to:
+  /// **'Always OCR'**
+  String get documentProcessingOcrAlways;
+
+  /// No description provided for @documentProcessingOcrNever.
+  ///
+  /// In en, this message translates to:
+  /// **'Never OCR'**
+  String get documentProcessingOcrNever;
+
+  /// No description provided for @documentProcessingOcrModelMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'Select an OCR model before enabling OCR modes.'**
+  String get documentProcessingOcrModelMissing;
+
+  /// No description provided for @documentProcessingDocx.
+  ///
+  /// In en, this message translates to:
+  /// **'DOCX files'**
+  String get documentProcessingDocx;
+
+  /// No description provided for @documentProcessingPdf.
+  ///
+  /// In en, this message translates to:
+  /// **'PDF files'**
+  String get documentProcessingPdf;
+
+  /// No description provided for @documentProcessingOtherOffice.
+  ///
+  /// In en, this message translates to:
+  /// **'Other Office files'**
+  String get documentProcessingOtherOffice;
+
+  /// No description provided for @documentProcessingModeExtract.
+  ///
+  /// In en, this message translates to:
+  /// **'Extract text'**
+  String get documentProcessingModeExtract;
+
+  /// No description provided for @documentProcessingModeDirect.
+  ///
+  /// In en, this message translates to:
+  /// **'Send file directly'**
+  String get documentProcessingModeDirect;
+
+  /// No description provided for @documentProcessingModeDiscard.
+  ///
+  /// In en, this message translates to:
+  /// **'Ignore file'**
+  String get documentProcessingModeDiscard;
 }
 
 class _AppLocalizationsDelegate

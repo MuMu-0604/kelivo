@@ -26,6 +26,7 @@ import '../../../core/models/assistant_regex.dart';
 import '../../../core/utils/multimodal_input_utils.dart';
 import '../../../utils/assistant_regex.dart';
 import '../../../utils/markdown_media_sanitizer.dart';
+import '../../model/utils/ocr_model_capability.dart';
 
 /// Service for building API messages from conversation state.
 ///
@@ -311,14 +312,18 @@ class MessageBuilderService {
   Future<List<String>> processUserMessagesForApi(
     List<Map<String, dynamic>> apiMessages,
     SettingsProvider settings,
-    Assistant? assistant,
-  ) async {
-    final bool ocrActive =
-        settings.ocrEnabled &&
-        settings.ocrModelProvider != null &&
-        settings.ocrModelId != null;
+    Assistant? assistant, {
+    required String providerKey,
+    required String modelId,
+  }) async {
+    final bool ocrActive = resolveOcrActive(
+      settings,
+      assistant: assistant,
+      providerKey: providerKey,
+      modelId: modelId,
+    );
 
-    List<String>? lastUserImagePaths;
+    List<String>? lastUserMediaPaths;
 
     // Find last user message index
     int lastUserIdx = -1;
@@ -327,6 +332,21 @@ class MessageBuilderService {
         lastUserIdx = i;
         break;
       }
+    }
+
+    String fileProcessingMode(DocumentAttachment attachment) {
+      final mime = _effectiveAttachmentMime(attachment);
+      if (isPdfMime(mime)) {
+        return assistant?.pdfMode ?? Assistant.documentModeExtract;
+      }
+      if (mime ==
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+        return assistant?.docxMode ?? Assistant.documentModeExtract;
+      }
+      if (isOfficeDocumentMime(mime)) {
+        return assistant?.otherOfficeMode ?? Assistant.documentModeDirect;
+      }
+      return Assistant.documentModeExtract;
     }
 
     Future<String?> readDocument(DocumentAttachment d) async {
@@ -383,18 +403,22 @@ class MessageBuilderService {
         for (final d in parsedUser.documents)
           if (isAudioMime(_effectiveAttachmentMime(d))) d.path.trim(),
       }..removeWhere((p) => p.isEmpty);
+      final directPaths = <String>{
+        for (final d in parsedUser.documents)
+          if (fileProcessingMode(d) == Assistant.documentModeDirect)
+            d.path.trim(),
+      }..removeWhere((p) => p.isEmpty);
 
-      final messageMediaPaths = parsedUser.imagePaths
-          .map((p) => p.trim())
-          .where(
-            (p) =>
-                p.isNotEmpty &&
-                (!ocrActive ||
-                    videoPaths.contains(p) ||
-                    audioPaths.contains(p)),
-          )
-          .toSet()
-          .toList(growable: false);
+      final messageMediaPaths = <String>{
+        for (final p in parsedUser.imagePaths.map((p) => p.trim()))
+          if (p.isNotEmpty &&
+              (!ocrActive ||
+                  videoPaths.contains(p) ||
+                  audioPaths.contains(p) ||
+                  directPaths.contains(p)))
+            p,
+        ...directPaths,
+      }.toList(growable: false);
       if (messageMediaPaths.isEmpty) {
         apiMessages[i].remove(internalMediaPathsKey);
       } else {
@@ -403,9 +427,9 @@ class MessageBuilderService {
 
       // Capture image paths from last user message
       if (i == lastUserIdx &&
-          lastUserImagePaths == null &&
+          lastUserMediaPaths == null &&
           parsedUser.imagePaths.isNotEmpty) {
-        lastUserImagePaths = List<String>.of(parsedUser.imagePaths);
+        lastUserMediaPaths = List<String>.of(parsedUser.imagePaths);
       }
 
       final inlineImagePaths = parsedUser.imagePaths
@@ -414,7 +438,8 @@ class MessageBuilderService {
             (p) =>
                 p.isNotEmpty &&
                 !videoPaths.contains(p) &&
-                !audioPaths.contains(p),
+                !audioPaths.contains(p) &&
+                !directPaths.contains(p),
           )
           .toList(growable: false);
 
@@ -434,6 +459,8 @@ class MessageBuilderService {
       final filePrompts = StringBuffer();
       for (final d in parsedUser.documents) {
         final effectiveMime = _effectiveAttachmentMime(d);
+        final mode = fileProcessingMode(d);
+        if (mode != Assistant.documentModeExtract) continue;
         if (isVideoMime(effectiveMime) || isAudioMime(effectiveMime)) {
           continue;
         }
@@ -457,7 +484,8 @@ class MessageBuilderService {
               (p) =>
                   p.isNotEmpty &&
                   !videoPaths.contains(p) &&
-                  !audioPaths.contains(p),
+                  !audioPaths.contains(p) &&
+                  !directPaths.contains(p),
             )
             .toSet()
             .toList();
@@ -491,7 +519,7 @@ class MessageBuilderService {
       apiMessages[lastUserIdx]['content'] = templated;
     }
 
-    return lastUserImagePaths ?? <String>[];
+    return lastUserMediaPaths ?? <String>[];
   }
 
   /// Default OCR text wrapper

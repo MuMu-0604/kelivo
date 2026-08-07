@@ -45,6 +45,7 @@ import '../../quick_phrase/pages/quick_phrases_page.dart';
 import '../../quick_phrase/widgets/quick_phrase_menu.dart';
 import '../../skills/pages/skills_page.dart';
 import '../widgets/chat_input_bar.dart';
+import '../widgets/document_processing_config.dart';
 import '../widgets/mini_map_sheet.dart';
 import '../widgets/instruction_injection_sheet.dart';
 import '../widgets/world_book_sheet.dart';
@@ -1289,9 +1290,11 @@ class _HomePageState extends State<HomePage>
           context,
         ).push(MaterialPageRoute(builder: (_) => const QuickPhrasesPage()));
       },
-      onToggleOcr: () async {
-        final sp = context.read<SettingsProvider>();
-        await sp.setOcrEnabled(!sp.ocrEnabled);
+      onDocumentProcessing: () async {
+        await showDocumentProcessingSheet(
+          context,
+          assistantId: context.read<AssistantProvider>().currentAssistantId,
+        );
       },
       onOpenMiniMap: _openMiniMap,
       onPickCamera: _controller.onPickCamera,

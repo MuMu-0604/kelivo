@@ -10,6 +10,7 @@ import '../../../core/providers/quick_phrase_provider.dart';
 import '../../../core/providers/skill_provider.dart';
 import '../../../core/providers/instruction_injection_provider.dart';
 import '../../../core/providers/world_book_provider.dart';
+import '../../model/utils/ocr_model_capability.dart';
 import '../utils/model_display_helper.dart';
 import 'chat_input_bar.dart';
 import 'model_icon.dart';
@@ -55,7 +56,7 @@ class ChatInputSection extends StatelessWidget {
     this.onCancelQueuedInput,
     this.onQuickPhrase,
     this.onLongPressQuickPhrase,
-    this.onToggleOcr,
+    this.onDocumentProcessing,
     this.onOpenMiniMap,
     this.onPickCamera,
     this.onPickPhotos,
@@ -98,7 +99,7 @@ class ChatInputSection extends StatelessWidget {
   final VoidCallback? onCancelQueuedInput;
   final VoidCallback? onQuickPhrase;
   final VoidCallback? onLongPressQuickPhrase;
-  final VoidCallback? onToggleOcr;
+  final VoidCallback? onDocumentProcessing;
   final VoidCallback? onOpenMiniMap;
   final VoidCallback? onPickCamera;
   final VoidCallback? onPickPhotos;
@@ -180,14 +181,16 @@ class ChatInputSection extends StatelessWidget {
       showQuickPhraseButton: _hasQuickPhrases(context, a),
       onQuickPhrase: onQuickPhrase,
       onLongPressQuickPhrase: onLongPressQuickPhrase,
-      // OCR button: show on desktop for mobile layout, always check settings for tablet layout
-      showOcrButton: isTablet
-          ? (settings.ocrModelProvider != null && settings.ocrModelId != null)
-          : (isDesktop &&
-                settings.ocrModelProvider != null &&
-                settings.ocrModelId != null),
-      ocrActive: settings.ocrEnabled,
-      onToggleOcr: onToggleOcr,
+      showOcrButton: isTablet || isDesktop,
+      ocrActive: (pk != null && mid != null)
+          ? resolveOcrActive(
+              settings,
+              assistant: a,
+              providerKey: pk,
+              modelId: mid,
+            )
+          : false,
+      onToggleOcr: onDocumentProcessing,
       // Tablet-specific parameters
       showMiniMapButton: isTablet,
       onOpenMiniMap: isTablet ? onOpenMiniMap : null,

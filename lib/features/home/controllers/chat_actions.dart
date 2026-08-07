@@ -562,10 +562,11 @@ class ChatActions {
           );
 
       // Build user image paths
-      final userImagePaths = messageGenerationService.buildUserImagePaths(
+      final userMediaPaths = messageGenerationService.buildUserMediaPaths(
         input: input,
-        lastUserImagePaths: prepared.lastUserImagePaths,
+        lastUserMediaPaths: prepared.lastUserMediaPaths,
         settings: settings,
+        assistant: assistant,
         providerKey: providerKey,
         modelId: modelId,
       );
@@ -574,7 +575,7 @@ class ChatActions {
       final ctx = messageGenerationService.buildGenerationContext(
         assistantMessage: assistantMessage,
         prepared: prepared,
-        userImagePaths: userImagePaths,
+        userMediaPaths: userMediaPaths,
         allowImagesApiRouting: input.allowImagesApiRouting,
         providerKey: providerKey,
         modelId: modelId,
@@ -757,10 +758,11 @@ class ChatActions {
         );
 
     // Build user image paths
-    final userImagePaths = messageGenerationService.buildUserImagePaths(
+    final userMediaPaths = messageGenerationService.buildUserMediaPaths(
       input: null,
-      lastUserImagePaths: prepared.lastUserImagePaths,
+      lastUserMediaPaths: prepared.lastUserMediaPaths,
       settings: settings,
+      assistant: assistant,
       providerKey: providerKey,
       modelId: modelId,
     );
@@ -769,7 +771,7 @@ class ChatActions {
     final ctx = messageGenerationService.buildGenerationContext(
       assistantMessage: assistantMessage,
       prepared: prepared,
-      userImagePaths: userImagePaths,
+      userMediaPaths: userMediaPaths,
       allowImagesApiRouting: allowImagesApiRouting,
       providerKey: providerKey,
       modelId: modelId,
@@ -863,10 +865,11 @@ class ChatActions {
             askUserService: askUserService,
           );
 
-      final userImagePaths = messageGenerationService.buildUserImagePaths(
+      final userMediaPaths = messageGenerationService.buildUserMediaPaths(
         input: null,
-        lastUserImagePaths: prepared.lastUserImagePaths,
+        lastUserMediaPaths: prepared.lastUserMediaPaths,
         settings: settings,
+        assistant: assistant,
         providerKey: providerKey,
         modelId: modelId,
       );
@@ -874,7 +877,7 @@ class ChatActions {
       final ctx = messageGenerationService.buildGenerationContext(
         assistantMessage: streamingMessage,
         prepared: prepared,
-        userImagePaths: userImagePaths,
+        userMediaPaths: userMediaPaths,
         allowImagesApiRouting: allowImagesApiRouting,
         providerKey: providerKey,
         modelId: modelId,
@@ -1016,7 +1019,7 @@ class ChatActions {
         config: ctx.config,
         modelId: ctx.modelId,
         messages: ctx.apiMessages,
-        userImagePaths: ctx.userImagePaths,
+        userMediaPaths: ctx.userMediaPaths,
         thinkingBudget:
             assistant?.thinkingBudget ?? ctx.settings.thinkingBudget,
         temperature: assistant?.temperature,

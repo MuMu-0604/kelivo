@@ -4,6 +4,24 @@ import 'assistant_regex.dart';
 import 'preset_message.dart';
 
 class Assistant {
+  static const String documentModeExtract = 'extract';
+  static const String documentModeDirect = 'direct';
+  static const String documentModeDiscard = 'discard';
+  static const Set<String> documentModes = <String>{
+    documentModeExtract,
+    documentModeDirect,
+    documentModeDiscard,
+  };
+
+  static const String ocrModeAuto = 'auto';
+  static const String ocrModeAlways = 'always';
+  static const String ocrModeNever = 'never';
+  static const Set<String> ocrModes = <String>{
+    ocrModeAuto,
+    ocrModeAlways,
+    ocrModeNever,
+  };
+
   static const int defaultRecentChatsSummaryMessageCount = 5;
   static const int minContextMessageSize = 1;
   static const int maxContextMessageSize = 1024;
@@ -34,6 +52,10 @@ class Assistant {
   final int? maxTokens; // null = unlimited
   final String systemPrompt;
   final String messageTemplate; // e.g. "{{ message }}"
+  final String docxMode; // 'extract' | 'direct' | 'discard'
+  final String pdfMode; // 'extract' | 'direct' | 'discard'
+  final String otherOfficeMode; // 'extract' | 'direct' | 'discard'
+  final String ocrMode; // 'auto' | 'always' | 'never'
   final bool searchEnabled; // per-assistant external web search switch
   final List<String> mcpServerIds; // bound MCP server IDs
   final List<String> localToolIds; // enabled local tool IDs
@@ -72,6 +94,10 @@ class Assistant {
     this.maxTokens,
     this.systemPrompt = '',
     this.messageTemplate = '{{ message }}',
+    this.docxMode = documentModeExtract,
+    this.pdfMode = documentModeExtract,
+    this.otherOfficeMode = documentModeDirect,
+    this.ocrMode = ocrModeAuto,
     this.searchEnabled = false,
     this.mcpServerIds = const <String>[],
     this.localToolIds = const <String>[],
@@ -105,6 +131,10 @@ class Assistant {
     int? maxTokens,
     String? systemPrompt,
     String? messageTemplate,
+    String? docxMode,
+    String? pdfMode,
+    String? otherOfficeMode,
+    String? ocrMode,
     bool? searchEnabled,
     List<String>? mcpServerIds,
     List<String>? localToolIds,
@@ -148,6 +178,10 @@ class Assistant {
       maxTokens: clearMaxTokens ? null : (maxTokens ?? this.maxTokens),
       systemPrompt: systemPrompt ?? this.systemPrompt,
       messageTemplate: messageTemplate ?? this.messageTemplate,
+      docxMode: docxMode ?? this.docxMode,
+      pdfMode: pdfMode ?? this.pdfMode,
+      otherOfficeMode: otherOfficeMode ?? this.otherOfficeMode,
+      ocrMode: ocrMode ?? this.ocrMode,
       searchEnabled: searchEnabled ?? this.searchEnabled,
       mcpServerIds: mcpServerIds ?? this.mcpServerIds,
       localToolIds: localToolIds ?? this.localToolIds,
@@ -184,6 +218,10 @@ class Assistant {
     'maxTokens': maxTokens,
     'systemPrompt': systemPrompt,
     'messageTemplate': messageTemplate,
+    'docxMode': docxMode,
+    'pdfMode': pdfMode,
+    'otherOfficeMode': otherOfficeMode,
+    'ocrMode': ocrMode,
     'searchEnabled': searchEnabled,
     'mcpServerIds': mcpServerIds,
     'localToolIds': localToolIds,
@@ -226,6 +264,19 @@ class Assistant {
       maxTokens: (json['maxTokens'] as num?)?.toInt(),
       systemPrompt: (json['systemPrompt'] as String?) ?? '',
       messageTemplate: (json['messageTemplate'] as String?) ?? '{{ message }}',
+      docxMode: _normalizeDocumentMode(
+        json['docxMode'],
+        fallback: documentModeExtract,
+      ),
+      pdfMode: _normalizeDocumentMode(
+        json['pdfMode'],
+        fallback: documentModeExtract,
+      ),
+      otherOfficeMode: _normalizeDocumentMode(
+        json['otherOfficeMode'],
+        fallback: documentModeDirect,
+      ),
+      ocrMode: _normalizeOcrMode(json['ocrMode']),
       searchEnabled: json['searchEnabled'] as bool? ?? false,
       mcpServerIds:
           (json['mcpServerIds'] as List?)?.cast<String>() ?? const <String>[],
@@ -306,5 +357,18 @@ class Assistant {
     } catch (_) {
       return const <Assistant>[];
     }
+  }
+
+  static String _normalizeDocumentMode(
+    dynamic raw, {
+    required String fallback,
+  }) {
+    final value = raw?.toString().trim().toLowerCase() ?? '';
+    return documentModes.contains(value) ? value : fallback;
+  }
+
+  static String _normalizeOcrMode(dynamic raw) {
+    final value = raw?.toString().trim().toLowerCase() ?? '';
+    return ocrModes.contains(value) ? value : ocrModeAuto;
   }
 }

@@ -552,7 +552,7 @@ class ChatApiService {
     required ProviderConfig config,
     required String modelId,
     required List<Map<String, dynamic>> messages,
-    List<String>? userImagePaths,
+    List<String>? userMediaPaths,
     int? thinkingBudget,
     double? temperature,
     double? topP,
@@ -591,9 +591,9 @@ class ChatApiService {
     final safeMessages = stripUnsupportedImageInputs
         ? await _stripImageInputsFromMessages(unicodeSafeMessages)
         : unicodeSafeMessages;
-    final safeUserImagePaths = stripUnsupportedImageInputs
+    final safeUserMediaPaths = stripUnsupportedImageInputs
         ? const <String>[]
-        : userImagePaths;
+        : userMediaPaths;
     final client = _clientFor(config, cancelToken);
 
     try {
@@ -604,7 +604,7 @@ class ChatApiService {
             config,
             modelId,
             safeMessages,
-            userImagePaths: safeUserImagePaths,
+            userMediaPaths: safeUserMediaPaths,
             extraHeaders: extraHeaders,
             extraBody: extraBody,
           );
@@ -614,7 +614,7 @@ class ChatApiService {
             config,
             modelId,
             safeMessages,
-            userImagePaths: safeUserImagePaths,
+            userMediaPaths: safeUserMediaPaths,
             thinkingBudget: thinkingBudget,
             temperature: temperature,
             topP: topP,
@@ -631,7 +631,7 @@ class ChatApiService {
             config,
             modelId,
             safeMessages,
-            userImagePaths: safeUserImagePaths,
+            userMediaPaths: safeUserMediaPaths,
             thinkingBudget: thinkingBudget,
             temperature: temperature,
             topP: topP,
@@ -649,7 +649,7 @@ class ChatApiService {
           config,
           modelId,
           safeMessages,
-          userImagePaths: safeUserImagePaths,
+          userMediaPaths: safeUserMediaPaths,
           thinkingBudget: thinkingBudget,
           temperature: temperature,
           topP: topP,
@@ -670,7 +670,7 @@ class ChatApiService {
             config: config,
             modelId: modelId,
             messages: safeMessages,
-            userImagePaths: safeUserImagePaths,
+            userMediaPaths: safeUserMediaPaths,
             thinkingBudget: thinkingBudget,
             temperature: temperature,
             topP: topP,
@@ -687,7 +687,7 @@ class ChatApiService {
             config,
             modelId,
             safeMessages,
-            userImagePaths: safeUserImagePaths,
+            userMediaPaths: safeUserMediaPaths,
             thinkingBudget: thinkingBudget,
             temperature: temperature,
             topP: topP,
@@ -704,7 +704,7 @@ class ChatApiService {
             config,
             modelId,
             safeMessages,
-            userImagePaths: safeUserImagePaths,
+            userMediaPaths: safeUserMediaPaths,
             thinkingBudget: thinkingBudget,
             temperature: temperature,
             topP: topP,

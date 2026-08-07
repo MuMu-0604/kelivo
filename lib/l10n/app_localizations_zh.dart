@@ -5406,6 +5406,45 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get skillsContentHint => '在这里粘贴技能指令。';
+
+  @override
+  String get documentProcessingTitle => '文档处理';
+
+  @override
+  String get documentProcessingNoAssistant => '未选择助手。';
+
+  @override
+  String get documentProcessingImageOcr => '图片 OCR';
+
+  @override
+  String get documentProcessingOcrAuto => '智能识别';
+
+  @override
+  String get documentProcessingOcrAlways => '总是 OCR';
+
+  @override
+  String get documentProcessingOcrNever => '永不 OCR';
+
+  @override
+  String get documentProcessingOcrModelMissing => '请先选择 OCR 模型，再启用 OCR 模式。';
+
+  @override
+  String get documentProcessingDocx => 'DOCX 文件';
+
+  @override
+  String get documentProcessingPdf => 'PDF 文件';
+
+  @override
+  String get documentProcessingOtherOffice => '其他 Office 文件';
+
+  @override
+  String get documentProcessingModeExtract => '提取文本';
+
+  @override
+  String get documentProcessingModeDirect => '直接发送文件';
+
+  @override
+  String get documentProcessingModeDiscard => '忽略文件';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -10810,6 +10849,45 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get skillsContentHint => '在这里粘贴技能指令。';
+
+  @override
+  String get documentProcessingTitle => '文档处理';
+
+  @override
+  String get documentProcessingNoAssistant => '未选择助手。';
+
+  @override
+  String get documentProcessingImageOcr => '图片 OCR';
+
+  @override
+  String get documentProcessingOcrAuto => '智能识别';
+
+  @override
+  String get documentProcessingOcrAlways => '总是 OCR';
+
+  @override
+  String get documentProcessingOcrNever => '永不 OCR';
+
+  @override
+  String get documentProcessingOcrModelMissing => '请先选择 OCR 模型，再启用 OCR 模式。';
+
+  @override
+  String get documentProcessingDocx => 'DOCX 文件';
+
+  @override
+  String get documentProcessingPdf => 'PDF 文件';
+
+  @override
+  String get documentProcessingOtherOffice => '其他 Office 文件';
+
+  @override
+  String get documentProcessingModeExtract => '提取文本';
+
+  @override
+  String get documentProcessingModeDirect => '直接发送文件';
+
+  @override
+  String get documentProcessingModeDiscard => '忽略文件';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -16214,4 +16292,43 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get skillsContentHint => '在這裡貼上技能指令。';
+
+  @override
+  String get documentProcessingTitle => '文件處理';
+
+  @override
+  String get documentProcessingNoAssistant => '未選擇助手。';
+
+  @override
+  String get documentProcessingImageOcr => '圖片 OCR';
+
+  @override
+  String get documentProcessingOcrAuto => '智慧辨識';
+
+  @override
+  String get documentProcessingOcrAlways => '總是 OCR';
+
+  @override
+  String get documentProcessingOcrNever => '永不 OCR';
+
+  @override
+  String get documentProcessingOcrModelMissing => '請先選擇 OCR 模型，再啟用 OCR 模式。';
+
+  @override
+  String get documentProcessingDocx => 'DOCX 檔案';
+
+  @override
+  String get documentProcessingPdf => 'PDF 檔案';
+
+  @override
+  String get documentProcessingOtherOffice => '其他 Office 檔案';
+
+  @override
+  String get documentProcessingModeExtract => '提取文字';
+
+  @override
+  String get documentProcessingModeDirect => '直接傳送檔案';
+
+  @override
+  String get documentProcessingModeDiscard => '忽略檔案';
 }

@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:Kelivo/core/models/assistant.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/features/model/utils/ocr_model_capability.dart';
 
@@ -110,6 +111,85 @@ void main() {
         ),
         isFalse,
       );
+    });
+
+    group('resolveOcrActive', () {
+      test(
+        'auto OCRs only for text-only chat models when OCR model is configured',
+        () async {
+          SharedPreferences.setMockInitialValues({});
+          final settings = SettingsProvider();
+
+          await _waitForSettingsLoad();
+          await settings.setProviderConfig(
+            'OcrProvider',
+            _configWithOcrCandidates(),
+          );
+          await settings.setOcrModel('OcrProvider', 'vision-model');
+
+          const assistant = Assistant(id: 'a1', name: 'A');
+          expect(
+            resolveOcrActive(
+              settings,
+              assistant: assistant,
+              providerKey: 'OcrProvider',
+              modelId: 'text-model',
+            ),
+            isTrue,
+          );
+          expect(
+            resolveOcrActive(
+              settings,
+              assistant: assistant,
+              providerKey: 'OcrProvider',
+              modelId: 'vision-model',
+            ),
+            isFalse,
+          );
+        },
+      );
+
+      test('always and never override model capability', () async {
+        SharedPreferences.setMockInitialValues({});
+        final settings = SettingsProvider();
+
+        await _waitForSettingsLoad();
+        await settings.setProviderConfig(
+          'OcrProvider',
+          _configWithOcrCandidates(),
+        );
+        await settings.setOcrModel('OcrProvider', 'vision-model');
+
+        const always = Assistant(
+          id: 'a1',
+          name: 'A',
+          ocrMode: Assistant.ocrModeAlways,
+        );
+        const never = Assistant(
+          id: 'a2',
+          name: 'B',
+          ocrMode: Assistant.ocrModeNever,
+        );
+
+        expect(
+          resolveOcrActive(
+            settings,
+            assistant: always,
+            providerKey: 'OcrProvider',
+            modelId: 'vision-model',
+          ),
+          isTrue,
+        );
+        expect(
+          resolveOcrActive(
+            settings,
+            assistant: never,
+            providerKey: 'OcrProvider',
+            modelId: 'text-model',
+          ),
+          isFalse,
+        );
+      });
     });
   });
 }

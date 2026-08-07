@@ -11,7 +11,7 @@ import '../../home/widgets/instruction_injection_sheet.dart';
 import '../../home/widgets/world_book_sheet.dart';
 import '../../instruction_injection/pages/instruction_injection_page.dart';
 import '../../world_book/pages/world_book_page.dart';
-import '../../model/widgets/ocr_prompt_sheet.dart';
+import '../../home/widgets/document_processing_config.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
 
 class BottomToolsSheet extends StatelessWidget {
@@ -225,11 +225,9 @@ class _LearningAndClearSectionState extends State<_LearningAndClearSection> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    final settings = context.watch<SettingsProvider>();
+    context.watch<SettingsProvider>();
     final worldBookProvider = context.watch<WorldBookProvider>();
     final cs = Theme.of(context).colorScheme;
-    final hasOcrModel =
-        settings.ocrModelProvider != null && settings.ocrModelId != null;
     final hasWorldBooks = worldBookProvider.books.isNotEmpty;
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -293,22 +291,24 @@ class _LearningAndClearSectionState extends State<_LearningAndClearSection> {
             ),
           ),
         ],
-        if (hasOcrModel) ...[
-          const SizedBox(height: 8),
-          _row(
-            icon: Lucide.Eye,
-            label: l10n.bottomToolsSheetOcr,
-            selected: settings.ocrEnabled,
-            onTap: () async {
-              Haptics.light();
-              final sp = context.read<SettingsProvider>();
-              await sp.setOcrEnabled(!sp.ocrEnabled);
-              if (!context.mounted) return;
-              Navigator.of(context).maybePop();
-            },
-            onLongPress: () => showOcrPromptSheet(context),
+        const SizedBox(height: 8),
+        _row(
+          icon: Lucide.FileText,
+          label: l10n.documentProcessingTitle,
+          selected: false,
+          onTap: () async {
+            Haptics.light();
+            await showDocumentProcessingSheet(
+              context,
+              assistantId: widget.assistantId,
+            );
+          },
+          trailing: Icon(
+            Lucide.ChevronRight,
+            size: 18,
+            color: cs.onSurface.withValues(alpha: 0.55),
           ),
-        ],
+        ),
         const SizedBox(height: 8),
         _row(
           icon: Lucide.workflow,

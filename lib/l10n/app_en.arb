@@ -2425,5 +2425,18 @@
   "skillsDescriptionLabel": "Description",
   "skillsTriggerKeywordsLabel": "Trigger keywords",
   "skillsTriggerKeywordsHint": "code review, dcf, rewrite",
-  "skillsContentHint": "Paste skill instructions here."
+  "skillsContentHint": "Paste skill instructions here.",
+  "documentProcessingTitle": "Document processing",
+  "documentProcessingNoAssistant": "No assistant selected.",
+  "documentProcessingImageOcr": "Image OCR",
+  "documentProcessingOcrAuto": "Auto",
+  "documentProcessingOcrAlways": "Always OCR",
+  "documentProcessingOcrNever": "Never OCR",
+  "documentProcessingOcrModelMissing": "Select an OCR model before enabling OCR modes.",
+  "documentProcessingDocx": "DOCX files",
+  "documentProcessingPdf": "PDF files",
+  "documentProcessingOtherOffice": "Other Office files",
+  "documentProcessingModeExtract": "Extract text",
+  "documentProcessingModeDirect": "Send file directly",
+  "documentProcessingModeDiscard": "Ignore file"
 }

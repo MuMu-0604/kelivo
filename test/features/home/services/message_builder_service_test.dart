@@ -1,9 +1,13 @@
+import 'dart:io';
+
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:Kelivo/core/models/assistant.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/models/conversation.dart';
+import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/features/home/services/message_builder_service.dart';
 
@@ -52,6 +56,12 @@ ChatMessage _message({
 }
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  setUp(() {
+    SharedPreferences.setMockInitialValues({});
+  });
+
   group('MessageBuilderService.parseInputFromRaw', () {
     test('默认将视频和音频文件路径纳入媒体路径供 API 使用', () {
       final service = MessageBuilderService(
@@ -544,6 +554,83 @@ void main() {
         'assistant',
         'user',
       ]);
+    });
+  });
+
+  group('MessageBuilderService.processUserMessagesForApi document modes', () {
+    test('sends direct Office files as media without extracting text', () async {
+      final service = MessageBuilderService(
+        chatService: _FakeChatService(const {}),
+        contextProvider: _FakeBuildContext(),
+      );
+      final file = File('${Directory.systemTemp.path}/kelivo_direct_test.docx');
+      await file.writeAsBytes([1, 2, 3]);
+      addTearDown(() async {
+        if (await file.exists()) await file.delete();
+      });
+
+      final messages = <Map<String, dynamic>>[
+        <String, dynamic>{
+          'role': 'user',
+          'content':
+              'summarize [file:${file.path}|test.docx|application/vnd.openxmlformats-officedocument.wordprocessingml.document]',
+        },
+      ];
+      final lastMedia = await service.processUserMessagesForApi(
+        messages,
+        SettingsProvider(),
+        const Assistant(
+          id: 'a1',
+          name: 'A',
+          docxMode: Assistant.documentModeDirect,
+        ),
+        providerKey: 'OpenAI',
+        modelId: 'gpt-4.1',
+      );
+
+      expect(lastMedia, isEmpty);
+      expect(messages.single[MessageBuilderService.internalMediaPathsKey], [
+        file.path,
+      ]);
+      expect(messages.single['content'], 'summarize');
+    });
+
+    test('discard mode drops file content and media path', () async {
+      final service = MessageBuilderService(
+        chatService: _FakeChatService(const {}),
+        contextProvider: _FakeBuildContext(),
+      );
+      final file = File('${Directory.systemTemp.path}/kelivo_discard_test.pdf');
+      await file.writeAsBytes([1, 2, 3]);
+      addTearDown(() async {
+        if (await file.exists()) await file.delete();
+      });
+
+      final messages = <Map<String, dynamic>>[
+        <String, dynamic>{
+          'role': 'user',
+          'content': 'ignore [file:${file.path}|test.pdf|application/pdf]',
+        },
+      ];
+      await service.processUserMessagesForApi(
+        messages,
+        SettingsProvider(),
+        const Assistant(
+          id: 'a1',
+          name: 'A',
+          pdfMode: Assistant.documentModeDiscard,
+        ),
+        providerKey: 'OpenAI',
+        modelId: 'gpt-4.1',
+      );
+
+      expect(
+        messages.single.containsKey(
+          MessageBuilderService.internalMediaPathsKey,
+        ),
+        isFalse,
+      );
+      expect(messages.single['content'], 'ignore');
     });
   });
 }

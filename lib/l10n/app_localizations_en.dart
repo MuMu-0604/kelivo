@@ -5626,4 +5626,44 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get skillsContentHint => 'Paste skill instructions here.';
+
+  @override
+  String get documentProcessingTitle => 'Document processing';
+
+  @override
+  String get documentProcessingNoAssistant => 'No assistant selected.';
+
+  @override
+  String get documentProcessingImageOcr => 'Image OCR';
+
+  @override
+  String get documentProcessingOcrAuto => 'Auto';
+
+  @override
+  String get documentProcessingOcrAlways => 'Always OCR';
+
+  @override
+  String get documentProcessingOcrNever => 'Never OCR';
+
+  @override
+  String get documentProcessingOcrModelMissing =>
+      'Select an OCR model before enabling OCR modes.';
+
+  @override
+  String get documentProcessingDocx => 'DOCX files';
+
+  @override
+  String get documentProcessingPdf => 'PDF files';
+
+  @override
+  String get documentProcessingOtherOffice => 'Other Office files';
+
+  @override
+  String get documentProcessingModeExtract => 'Extract text';
+
+  @override
+  String get documentProcessingModeDirect => 'Send file directly';
+
+  @override
+  String get documentProcessingModeDiscard => 'Ignore file';
 }

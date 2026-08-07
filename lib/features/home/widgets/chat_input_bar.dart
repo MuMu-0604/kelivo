@@ -1320,14 +1320,14 @@ class _ChatInputBarState extends State<ChatInputBar>
             _OverflowAction(
               width: normalButtonW,
               builder: () => _CompactIconButton(
-                tooltip: l10n.chatInputBarOcrTooltip,
+                tooltip: l10n.documentProcessingTitle,
                 icon: Lucide.Eye,
                 active: widget.ocrActive,
                 onTap: lockTap(widget.onToggleOcr),
               ),
               menu: DesktopContextMenuItem(
                 icon: Lucide.Eye,
-                label: l10n.chatInputBarOcrTooltip,
+                label: l10n.documentProcessingTitle,
                 onTap: lockTap(widget.onToggleOcr),
               ),
             ),

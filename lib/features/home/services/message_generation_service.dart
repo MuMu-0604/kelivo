@@ -10,6 +10,7 @@ import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/model_override_payload_parser.dart';
 import '../../../core/utils/multimodal_input_utils.dart';
 import '../../../core/utils/openai_model_compat.dart';
+import '../../model/utils/ocr_model_capability.dart';
 import '../../../utils/assistant_regex.dart';
 import '../../../core/models/assistant_regex.dart';
 import '../controllers/stream_controller.dart' as stream_ctrl;
@@ -53,14 +54,14 @@ class PreparedGeneration {
   final List<Map<String, dynamic>> toolDefs;
   final ToolCallHandler? onToolCall;
   final bool hasBuiltInSearch;
-  final List<String> lastUserImagePaths;
+  final List<String> lastUserMediaPaths;
 
   PreparedGeneration({
     required this.apiMessages,
     required this.toolDefs,
     this.onToolCall,
     required this.hasBuiltInSearch,
-    required this.lastUserImagePaths,
+    required this.lastUserMediaPaths,
   });
 }
 
@@ -158,8 +159,14 @@ class MessageGenerationService {
     }
 
     // Process user messages (documents, OCR, templates)
-    final lastUserImagePaths = await messageBuilderService
-        .processUserMessagesForApi(apiMessages, settings, assistant);
+    final lastUserMediaPaths = await messageBuilderService
+        .processUserMessagesForApi(
+          apiMessages,
+          settings,
+          assistant,
+          providerKey: providerKey,
+          modelId: modelId,
+        );
 
     // Signal processing finished
     onFileProcessingFinished?.call();
@@ -219,7 +226,7 @@ class MessageGenerationService {
       toolDefs: toolDefs,
       onToolCall: onToolCall,
       hasBuiltInSearch: hasBuiltInSearch,
-      lastUserImagePaths: lastUserImagePaths,
+      lastUserMediaPaths: lastUserMediaPaths,
     );
   }
 
@@ -299,7 +306,7 @@ class MessageGenerationService {
   stream_ctrl.GenerationContext buildGenerationContext({
     required ChatMessage assistantMessage,
     required PreparedGeneration prepared,
-    required List<String> userImagePaths,
+    required List<String> userMediaPaths,
     required bool allowImagesApiRouting,
     required String providerKey,
     required String modelId,
@@ -309,15 +316,17 @@ class MessageGenerationService {
     required bool enableReasoning,
     required bool generateTitleOnFinish,
   }) {
-    final bool ocrActive =
-        settings.ocrEnabled &&
-        settings.ocrModelProvider != null &&
-        settings.ocrModelId != null;
+    final bool ocrActive = resolveOcrActive(
+      settings,
+      assistant: assistant,
+      providerKey: providerKey,
+      modelId: modelId,
+    );
 
     return stream_ctrl.GenerationContext(
       assistantMessage: assistantMessage,
       apiMessages: prepared.apiMessages,
-      userImagePaths: userImagePaths,
+      userMediaPaths: userMediaPaths,
       allowImagesApiRouting: allowImagesApiRouting,
       providerKey: providerKey,
       modelId: modelId,
@@ -549,23 +558,28 @@ class MessageGenerationService {
             fallbackMime: 'image/png',
           );
           if (isAudioMime(mime)) return includeAudio;
-          return isImageMime(mime) || isVideoMime(mime);
+          return isImageMime(mime) ||
+              isVideoMime(mime) ||
+              isDirectUploadDocumentMime(mime);
         })
         .toList(growable: false);
   }
 
   /// Build user image paths considering OCR mode.
-  List<String> buildUserImagePaths({
+  List<String> buildUserMediaPaths({
     required ChatInputData? input,
-    required List<String> lastUserImagePaths,
+    required List<String> lastUserMediaPaths,
     required SettingsProvider settings,
+    required Assistant? assistant,
     required String providerKey,
     required String modelId,
   }) {
-    final bool ocrActive =
-        settings.ocrEnabled &&
-        settings.ocrModelProvider != null &&
-        settings.ocrModelId != null;
+    final bool ocrActive = resolveOcrActive(
+      settings,
+      assistant: assistant,
+      providerKey: providerKey,
+      modelId: modelId,
+    );
 
     final includeAudio = _shouldIncludeAudioForProvider(
       settings,
@@ -578,6 +592,7 @@ class MessageGenerationService {
       for (final d in input.documents) {
         final effectiveMime = _effectiveAttachmentMime(d);
         if (isVideoMime(effectiveMime) ||
+            isDirectUploadDocumentMime(effectiveMime) ||
             (includeAudio && isAudioMime(effectiveMime))) {
           currentMediaPaths.add(d.path);
         }
@@ -589,7 +604,7 @@ class MessageGenerationService {
     }
 
     return _filterMediaPathsForProvider(
-      lastUserImagePaths
+      lastUserMediaPaths
           .where((path) {
             if (!ocrActive) return true;
             return !isImageMime(

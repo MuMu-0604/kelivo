@@ -681,6 +681,17 @@ Future<List<Map<String, dynamic>>> _buildOpenAIChatCompletionMessages(
             ? _mimeFromDataUrl(p)
             : _mimeFromPath(p);
         if (isAudioMime(mime)) continue;
+        if (isDirectUploadDocumentMime(mime)) {
+          final fileName = p.replaceAll('\\', '/').split('/').last;
+          final dataUrl = isInlineUrl
+              ? p
+              : await _encodeBase64File(p, withPrefix: true);
+          parts.add({
+            'type': 'file',
+            'file': {'filename': fileName, 'file_data': dataUrl},
+          });
+          continue;
+        }
         final bool isVideo = isVideoMime(mime);
         final String dataUrl = isInlineUrl
             ? p
@@ -872,7 +883,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
   ProviderConfig config,
   String modelId,
   List<Map<String, dynamic>> messages, {
-  List<String>? userImagePaths,
+  List<String>? userMediaPaths,
   int? thinkingBudget,
   double? temperature,
   double? topP,
@@ -1070,7 +1081,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
       final hasAttachedImages =
           canImageInput &&
           isLast &&
-          (userImagePaths?.isNotEmpty == true) &&
+          (userMediaPaths?.isNotEmpty == true) &&
           (m['role'] == 'user');
       // For the last user message, also attach the last assistant image if available
       final shouldAttachAssistantImage =
@@ -1154,10 +1165,27 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
         }
         // Additional images explicitly attached to the last user message
         if (hasAttachedImages) {
-          for (final p in userImagePaths!) {
+          for (final p in userMediaPaths!) {
             final normalized = normalizeSrc(p);
             if (!seenImageSources.add(normalized)) continue;
-            final dataUrl = (p.startsWith('http') || p.startsWith('data:'))
+            final bool isInlineUrl =
+                p.startsWith('http') || p.startsWith('data:');
+            final String mime = isInlineUrl
+                ? _mimeFromDataUrl(p)
+                : _mimeFromPath(p);
+            if (isDirectUploadDocumentMime(mime)) {
+              final fileName = p.replaceAll('\\', '/').split('/').last;
+              final dataUrl = isInlineUrl
+                  ? p
+                  : await _encodeBase64File(p, withPrefix: true);
+              parts.add({
+                'type': 'input_file',
+                'filename': fileName,
+                'file_data': dataUrl,
+              });
+              continue;
+            }
+            final dataUrl = isInlineUrl
                 ? p
                 : await _encodeBase64File(p, withPrefix: true);
             addImage(dataUrl);
@@ -1264,7 +1292,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
         'model': upstreamModelId,
         'messages': await _buildLongCatOmniMessages(
           messages,
-          userMediaPaths: userImagePaths,
+          userMediaPaths: userMediaPaths,
         ),
         'stream': stream,
         'output_modalities': const ['text'],
@@ -1279,7 +1307,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
     } else {
       final mm = await _buildOpenAIChatCompletionMessages(
         messages,
-        userMediaPaths: userImagePaths,
+        userMediaPaths: userMediaPaths,
         canImageInput: canImageInput,
       );
       body = {
@@ -1608,11 +1636,11 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
           reqBody['messages'] = useLongCatOmniPayload
               ? await _buildLongCatOmniMessages(
                   next,
-                  userMediaPaths: userImagePaths,
+                  userMediaPaths: userMediaPaths,
                 )
               : await _buildOpenAIChatCompletionMessages(
                   next,
-                  userMediaPaths: userImagePaths,
+                  userMediaPaths: userMediaPaths,
                   canImageInput: canImageInput,
                 );
           reqBody.remove('stream');
@@ -1815,7 +1843,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                     'model': upstreamModelId,
                     'messages': await _buildLongCatOmniMessages(
                       currentMessages,
-                      userMediaPaths: userImagePaths,
+                      userMediaPaths: userMediaPaths,
                     ),
                     'stream': true,
                     'output_modalities': const ['text'],
@@ -1832,7 +1860,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                     'model': upstreamModelId,
                     'messages': await _buildOpenAIChatCompletionMessages(
                       currentMessages,
-                      userMediaPaths: userImagePaths,
+                      userMediaPaths: userMediaPaths,
                       canImageInput: canImageInput,
                     ),
                     'stream': true,
@@ -3214,7 +3242,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                     'model': upstreamModelId,
                     'messages': await _buildLongCatOmniMessages(
                       currentMessages,
-                      userMediaPaths: userImagePaths,
+                      userMediaPaths: userMediaPaths,
                     ),
                     'stream': true,
                     'output_modalities': const ['text'],
@@ -3231,7 +3259,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                     'model': upstreamModelId,
                     'messages': await _buildOpenAIChatCompletionMessages(
                       currentMessages,
-                      userMediaPaths: userImagePaths,
+                      userMediaPaths: userMediaPaths,
                       canImageInput: canImageInput,
                     ),
                     'stream': true,
@@ -3727,7 +3755,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                         'model': upstreamModelId,
                         'messages': await _buildLongCatOmniMessages(
                           currentMessages,
-                          userMediaPaths: userImagePaths,
+                          userMediaPaths: userMediaPaths,
                         ),
                         'stream': true,
                         'output_modalities': const ['text'],
@@ -3744,7 +3772,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                         'model': upstreamModelId,
                         'messages': await _buildOpenAIChatCompletionMessages(
                           currentMessages,
-                          userMediaPaths: userImagePaths,
+                          userMediaPaths: userMediaPaths,
                           canImageInput: canImageInput,
                         ),
                         'stream': true,
