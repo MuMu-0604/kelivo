@@ -106,10 +106,13 @@ jobs:
           echo "版本号: $VERSION"
       # 如果有签名密钥，写入密钥文件
       - name: 🔑 写入签名密钥
-        if: ${{ env.SIGN_KEYSTORE_BASE64 != '' }}
         env:
           SIGN_KEYSTORE_BASE64: ${{ secrets.SIGN_KEYSTORE_BASE64 }}
         run: |
+          if [ -z "$SIGN_KEYSTORE_BASE64" ]; then
+            echo "❌ 未配置 SIGN_KEYSTORE_BASE64，无法生成可覆盖已发布 9015 APK 的签名包"
+            exit 1
+          fi
           echo "$SIGN_KEYSTORE_BASE64" | base64 --decode > android/app/key.jks
           echo "storeFile=key.jks" >> android/key.properties
           echo "storePassword=${{ secrets.KEYSTORE_PASSWORD }}" >> android/key.properties
@@ -117,15 +120,27 @@ jobs:
           echo "keyPassword=${{ secrets.KEY_PASSWORD }}" >> android/key.properties
           echo "✅ 签名配置已写入"
       - name: 🏗️ 构建 APK
-        run: flutter build apk --release --split-per-abi
+        run: |
+          flutter build apk --release
+          flutter build apk --release --split-per-abi
 
       - name: 📦 重命名 APK
         run: |
           cd build/app/outputs/flutter-apk
+          if [ -f app-release.apk ]; then
+            mv app-release.apk "Kelivo_android_${VERSION}_universal.apk"
+          fi
           for file in app-*-release.apk; do
+            [ -e "$file" ] || continue
             abi=$(echo "$file" | sed -E 's/app-(.*)-release\.apk/\1/')
             mv "$file" "Kelivo_android_${VERSION}_${abi}.apk"
           done
+      - name: 📤 上传构建产物 (universal)
+        uses: actions/upload-artifact@v4
+        with:
+          name: Android-universal
+          path: build/app/outputs/flutter-apk/Kelivo_android_*_universal.apk
+
       - name: 📤 上传构建产物 (arm64-v8a)
         uses: actions/upload-artifact@v4
         with:

@@ -20,9 +20,10 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = appIdOverride ?: "com.psyche.kelivo"
-        manifestPlaceholders["appLabel"] = appLabelOverride ?: "Kelivo"
+        // Default to the 9015 coexist package so 9020+ upgrades replace Kelivo Slider,
+        // while still installing beside upstream Kelivo (com.psyche.kelivo).
+        applicationId = appIdOverride ?: "com.psyche.kelivo.sliderpreview"
+        manifestPlaceholders["appLabel"] = appLabelOverride ?: "Kelivo Slider"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion

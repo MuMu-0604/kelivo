@@ -96,7 +96,9 @@ The `1.1.17+9015` APK is a coexistence build. It uses Android package name `com.
 - If Android reports a signature conflict, remove the older non-coexistence or mismatched-signed Kelivo Plus build, then install the 9015 APK again.
 - Migrate data through backup/import instead of directly sharing private app data.
 
-To build a coexistence variant from source, keep the same codebase and pass app identity overrides:
+Current source builds default to the Android coexistence identity: `com.psyche.kelivo.sliderpreview` / `Kelivo Slider`. With the same signing certificate, a higher version code can update the 9015 coexistence APK while still installing beside upstream Kelivo (`com.psyche.kelivo`).
+
+To temporarily override the build identity, pass Gradle properties:
 
 ```powershell
 flutter build apk --release `

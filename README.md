@@ -106,7 +106,9 @@ GitHub 工具按使用场景分组封装，不再把每个 API 端点都暴露�
 3. 打开桌面上的 `Kelivo Slider`。
 4. 按需通过备份/导入迁移配置、聊天记录、助手、MCP 和模型设置。
 
-如需自行构建共存包，可以在不改源码默认包名的情况下传入 Gradle 参数：
+当前源码默认构建 Android 共存包，包名与 9015 对齐为 `com.psyche.kelivo.sliderpreview`，使用同一签名证书且版本号更高时可覆盖安装 9015，且仍可与原版 Kelivo 的 `com.psyche.kelivo` 同时安装。
+
+如需临时覆盖构建身份，仍可传入 Gradle 参数：
 
 ```powershell
 flutter build apk --release `
@@ -114,7 +116,7 @@ flutter build apk --release `
   -PkelivoAppLabel="Kelivo Slider"
 ```
 
-默认源码构建仍使用原包名 `com.psyche.kelivo`；只有传入上述参数时才会生成共存包。
+不传入上述参数时，默认生成 `com.psyche.kelivo.sliderpreview` / `Kelivo Slider` 共存包。
 
 ### 配置模型
 

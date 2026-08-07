@@ -23,7 +23,7 @@ SHA256：
 - 新增移动端推理强度滑块的共存构建支持。
 - 9015 APK 使用独立 Android 包名 `com.psyche.kelivo.sliderpreview`。
 - 启动器显示名称为 `Kelivo Slider`，可与原版 Kelivo 同时安装。
-- 保留默认源码包名 `com.psyche.kelivo`；只有传入 Gradle 参数时才生成共存包。
+- 默认源码构建已对齐 9015 共存包名 `com.psyche.kelivo.sliderpreview`，使用同一签名证书时 9020+ 可覆盖安装 9015，同时继续与原版 Kelivo 共存。
 - README 已更新为 9015 下载地址和共存安装说明。
 
 ## 已继承能力
@@ -37,8 +37,8 @@ SHA256：
 
 ## 安装与共存
 
-- 9015 共存 APK 不会覆盖原版 Kelivo。
-- 原版包名仍是 `com.psyche.kelivo`，9015 共存包名是 `com.psyche.kelivo.sliderpreview`。
+- 9015/9020 共存 APK 不会覆盖原版 Kelivo。
+- 原版包名仍是 `com.psyche.kelivo`，9015/9020 共存包名是 `com.psyche.kelivo.sliderpreview`。
 - 共存包与原版 Kelivo 使用独立应用数据，不会直接读取原版私有数据。
 - 如需迁移配置、聊天记录、助手、MCP 或模型设置，请通过备份/导入完成。
 
