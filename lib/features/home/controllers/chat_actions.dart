@@ -101,7 +101,38 @@ class ChatActions {
     required this.messageGenerationService,
     required this.contextProvider,
     required this.viewModel,
-  });
+  }) {
+    _current = this;
+  }
+
+  static ChatActions? _current;
+
+  /// Stop an in-flight generation before its conversation is deleted.
+  static Future<void> cancelActiveGenerationFor(String conversationId) async {
+    final actions = _current;
+    if (actions == null || !actions._hasActiveGeneration(conversationId)) {
+      return;
+    }
+    await actions.cancelStreamingById(conversationId);
+  }
+
+  /// Stop in-flight generations owned by an assistant before cascade delete.
+  static Future<void> cancelActiveGenerationsForAssistant(
+    String assistantId,
+  ) async {
+    final actions = _current;
+    if (actions == null) return;
+    final conversationIds = actions.chatService
+        .getAllConversations()
+        .where((conversation) => conversation.assistantId == assistantId)
+        .map((conversation) => conversation.id)
+        .toList();
+    for (final id in conversationIds) {
+      if (actions._hasActiveGeneration(id)) {
+        await actions.cancelStreamingById(id);
+      }
+    }
+  }
 
   final HomeViewModel viewModel;
   final ChatService chatService;
@@ -253,6 +284,11 @@ class ChatActions {
       chatController.loadingConversationIds;
   Map<String, StreamSubscription<dynamic>> get _conversationStreams =>
       chatController.conversationStreams;
+
+  bool _hasActiveGeneration(String conversationId) =>
+      _conversationStreams.containsKey(conversationId) ||
+      _loadingConversationIds.contains(conversationId) ||
+      isSendInFlight(conversationId);
 
   @visibleForTesting
   bool isSendInFlight(String conversationId) =>
@@ -1101,7 +1137,11 @@ class ChatActions {
   Future<void> cancelStreaming(Conversation? conversation) async {
     final cid = conversation?.id;
     if (cid == null) return;
+    await cancelStreamingById(cid);
+  }
 
+  /// Cancel the active streaming for the conversation with id [cid].
+  Future<void> cancelStreamingById(String cid) async {
     // Cancel any pending tool approval requests to prevent deadlock
     try {
       contextProvider.read<ToolApprovalService>().cancelAll();

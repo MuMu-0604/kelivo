@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 
 import '../../../icons/lucide_adapter.dart';
 import '../../../core/services/chat/chat_service.dart';
+import '../../home/controllers/chat_actions.dart';
 import '../../../core/models/conversation.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../theme/app_font_weights.dart';
@@ -111,6 +112,7 @@ class _ChatHistoryPageState extends State<ChatHistoryPage>
                     .map((c) => c.id)
                     .toList();
                 for (final id in idsToDelete) {
+                  await ChatActions.cancelActiveGenerationFor(id);
                   await svc.deleteConversation(id);
                 }
                 if (!context.mounted) return;
@@ -286,7 +288,9 @@ class _ChatHistoryPageState extends State<ChatHistoryPage>
         ),
       ),
       onDismissed: (_) async {
-        await context.read<ChatService>().deleteConversation(c.id);
+        final chatService = context.read<ChatService>();
+        await ChatActions.cancelActiveGenerationFor(c.id);
+        await chatService.deleteConversation(c.id);
         if (!context.mounted) return;
         showAppSnackBar(
           context,

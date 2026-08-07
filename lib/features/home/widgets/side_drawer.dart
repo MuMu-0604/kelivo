@@ -19,6 +19,7 @@ import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/update_provider.dart';
 import '../../../core/models/assistant.dart';
 import '../../chat/pages/chat_history_page.dart';
+import '../controllers/chat_actions.dart';
 import '../../../desktop/chat_history_dialog.dart';
 import 'package:flutter/services.dart';
 import 'dart:io' show File;
@@ -290,6 +291,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
               final deletingCurrent =
                   chatService.currentConversationId == chat.id;
               final nextId = _nextRecentConversation(chatService, chat.id);
+              await ChatActions.cancelActiveGenerationFor(chat.id);
               await chatService.deleteConversation(chat.id);
               if (!context.mounted) return;
               showAppSnackBar(
@@ -489,6 +491,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                           chatService,
                           chat.id,
                         );
+                        await ChatActions.cancelActiveGenerationFor(chat.id);
                         await chatService.deleteConversation(chat.id);
                         if (!context.mounted) return;
                         showAppSnackBar(
