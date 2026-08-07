@@ -1777,6 +1777,8 @@
   "ttsSettingsPlaybackSection": "Playback",
   "ttsSettingsAutoPlayTitle": "Auto-play Assistant Replies",
   "ttsSettingsAutoPlayDescription": "Start TTS automatically after an assistant reply finishes.",
+  "ttsSettingsCacheReplayTitle": "Reuse Audio for Replay",
+  "ttsSettingsCacheReplayDescription": "Replay network speech with already generated audio instead of calling the speech service again.",
   "ttsSettingsTextSelectionSection": "Text Selection",
   "ttsSettingsTextSelectionFallbackDescription": "If no matching text is found, the full reply is played.",
   "ttsSettingsTextSelectionFullTextTitle": "Full text",
@@ -1799,6 +1801,18 @@
   "ttsFloatingCloseTooltip": "Close player",
   "ttsFloatingExpandTooltip": "Expand playback controls",
   "ttsFloatingCollapseTooltip": "Collapse playback controls",
+  "ttsFloatingSaveTooltip": "Save audio",
+  "ttsSaveDialogTitle": "Save TTS audio",
+  "ttsSaveSuccess": "Audio saved successfully.",
+  "ttsSaveNothing": "No audio is available to save.",
+  "ttsSaveFailed": "Failed to save audio: {message}",
+  "@ttsSaveFailed": {
+    "placeholders": {
+      "message": {
+        "type": "String"
+      }
+    }
+  },
   "imageViewerPageShareFailedOpenFile": "Unable to share, tried to open file: {message}",
   "@imageViewerPageShareFailedOpenFile": {
     "placeholders": {

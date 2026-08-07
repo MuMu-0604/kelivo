@@ -12,11 +12,15 @@ class ThinkingTagParseResult {
 
 class ThinkingTagParser {
   static final RegExp _openTagRe = RegExp(
-    r'<(think|thought)>',
+    r'<(think|thinking|thought)>|<\|channel>thought',
     caseSensitive: false,
   );
 
+  /// Test hook: number of [parseLegacyInlineBlocks] executions.
+  static int debugParseCount = 0;
+
   static ThinkingTagParseResult parseLegacyInlineBlocks(String input) {
+    debugParseCount++;
     final visible = StringBuffer();
     final thinkingTexts = <String>[];
     var cursor = 0;
@@ -30,8 +34,8 @@ class ThinkingTagParser {
 
       final openStart = cursor + openMatch.start;
       final openEnd = cursor + openMatch.end;
-      final tagName = (openMatch.group(1) ?? '').toLowerCase();
-      final closeTag = '</$tagName>';
+      final tagName = openMatch.group(1)?.toLowerCase();
+      final closeTag = tagName == null ? '<channel|>' : '</$tagName>';
       final closeStart = input.toLowerCase().indexOf(closeTag, openEnd);
 
       if (closeStart == -1) {

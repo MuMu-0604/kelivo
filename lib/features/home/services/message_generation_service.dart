@@ -205,12 +205,16 @@ class MessageGenerationService {
     await messageBuilderService.inlineLocalImages(apiMessages);
 
     // Prepare tools
+    final mcpRouteSnapshot = generationController.captureMcpToolRoutes(
+      assistant,
+    );
     final toolDefs = generationController.buildToolDefinitions(
       settings,
       assistant,
       providerKey,
       modelId,
       hasBuiltInSearch,
+      mcpRouteSnapshot: mcpRouteSnapshot,
     );
     final onToolCall = toolDefs.isNotEmpty
         ? generationController.buildToolCallHandler(
@@ -218,6 +222,7 @@ class MessageGenerationService {
             assistant,
             approvalService: approvalService,
             askUserService: askUserService,
+            mcpRouteSnapshot: mcpRouteSnapshot,
           )
         : null;
 

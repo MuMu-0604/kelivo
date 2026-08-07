@@ -6,6 +6,7 @@ import '../../../core/providers/model_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/api/chat_api_service.dart';
 import '../../../core/services/chat/chat_service.dart';
+import '../../../core/services/mcp/mcp_tool_service.dart';
 import '../../model/utils/ocr_model_capability.dart';
 import '../../../utils/assistant_regex.dart';
 import '../../../core/models/assistant_regex.dart';
@@ -119,6 +120,10 @@ class GenerationController {
   // Tool Definitions Builder (delegated to ToolHandlerService)
   // ============================================================================
 
+  McpToolRouteSnapshot captureMcpToolRoutes(Assistant? assistant) {
+    return toolHandlerService.captureMcpToolRoutes(assistant);
+  }
+
   /// Prepare tool definitions for API call.
   /// Delegates to ToolHandlerService.buildToolDefinitions.
   List<Map<String, dynamic>> buildToolDefinitions(
@@ -126,8 +131,9 @@ class GenerationController {
     Assistant? assistant,
     String providerKey,
     String modelId,
-    bool hasBuiltInSearch,
-  ) {
+    bool hasBuiltInSearch, {
+    McpToolRouteSnapshot? mcpRouteSnapshot,
+  }) {
     return toolHandlerService.buildToolDefinitions(
       settings,
       assistant,
@@ -135,6 +141,7 @@ class GenerationController {
       modelId,
       hasBuiltInSearch,
       isToolModel: isToolModel,
+      mcpRouteSnapshot: mcpRouteSnapshot,
     );
   }
 
@@ -145,12 +152,14 @@ class GenerationController {
     Assistant? assistant, {
     ToolApprovalService? approvalService,
     AskUserInteractionService? askUserService,
+    McpToolRouteSnapshot? mcpRouteSnapshot,
   }) {
     return toolHandlerService.buildToolCallHandler(
       settings,
       assistant,
       approvalService: approvalService,
       askUserService: askUserService,
+      mcpRouteSnapshot: mcpRouteSnapshot,
     );
   }
 

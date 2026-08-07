@@ -4324,6 +4324,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Start TTS automatically after an assistant reply finishes.';
 
   @override
+  String get ttsSettingsCacheReplayTitle => 'Reuse Audio for Replay';
+
+  @override
+  String get ttsSettingsCacheReplayDescription =>
+      'Replay network speech with already generated audio instead of calling the speech service again.';
+
+  @override
   String get ttsSettingsTextSelectionSection => 'Text Selection';
 
   @override
@@ -4395,6 +4402,23 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get ttsFloatingCollapseTooltip => 'Collapse playback controls';
+
+  @override
+  String get ttsFloatingSaveTooltip => 'Save audio';
+
+  @override
+  String get ttsSaveDialogTitle => 'Save TTS audio';
+
+  @override
+  String get ttsSaveSuccess => 'Audio saved successfully.';
+
+  @override
+  String get ttsSaveNothing => 'No audio is available to save.';
+
+  @override
+  String ttsSaveFailed(String message) {
+    return 'Failed to save audio: $message';
+  }
 
   @override
   String imageViewerPageShareFailedOpenFile(String message) {

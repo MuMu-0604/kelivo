@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:Kelivo/core/services/tts/network_tts.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -355,6 +356,38 @@ void main() {
       },
     );
   });
+
+  test('combines WAV data after variable RIFF chunks', () {
+    final format = _pcmFormat(24000);
+    final first = _buildWav(<(String, List<int>)>[
+      ('JUNK', <int>[9, 8, 7]),
+      ('fmt ', format),
+      ('LIST', <int>[1, 2, 3, 4]),
+      ('fact', _uint32Bytes(1)),
+      ('data', <int>[1, 2]),
+    ]);
+    final second = _buildWav(<(String, List<int>)>[
+      ('fmt ', format),
+      ('fact', _uint32Bytes(1)),
+      ('data', <int>[3, 4]),
+    ]);
+
+    final combined = combineWavAudio(<Uint8List>[first, second]);
+
+    expect(_riffChunkOffset(first, 'data'), greaterThan(44));
+    expect(_riffChunkData(combined, 'data'), <int>[1, 2, 3, 4]);
+    expect(
+      () => combineWavAudio(<Uint8List>[
+        first,
+        _buildWav(<(String, List<int>)>[
+          ('fmt ', _pcmFormat(16000)),
+          ('fact', _uint32Bytes(1)),
+          ('data', <int>[3, 4]),
+        ]),
+      ]),
+      throwsFormatException,
+    );
+  });
 }
 
 Future<HttpServer> _bindServer(
@@ -371,4 +404,55 @@ String _baseUrl(HttpServer server) {
 
 String _hostOnlyBaseUrl(HttpServer server) {
   return 'http://${server.address.address}:${server.port}';
+}
+
+Uint8List _pcmFormat(int sampleRate) {
+  final format = ByteData(16)
+    ..setUint16(0, 1, Endian.little)
+    ..setUint16(2, 1, Endian.little)
+    ..setUint32(4, sampleRate, Endian.little)
+    ..setUint32(8, sampleRate * 2, Endian.little)
+    ..setUint16(12, 2, Endian.little)
+    ..setUint16(14, 16, Endian.little);
+  return format.buffer.asUint8List();
+}
+
+Uint8List _uint32Bytes(int value) {
+  final bytes = ByteData(4)..setUint32(0, value, Endian.little);
+  return bytes.buffer.asUint8List();
+}
+
+Uint8List _buildWav(List<(String, List<int>)> chunks) {
+  final body = BytesBuilder(copy: false)..add(utf8.encode('WAVE'));
+  for (final chunk in chunks) {
+    body
+      ..add(utf8.encode(chunk.$1))
+      ..add(_uint32Bytes(chunk.$2.length))
+      ..add(chunk.$2);
+    if (chunk.$2.length.isOdd) body.addByte(0);
+  }
+  final bodyBytes = body.takeBytes();
+  return (BytesBuilder(copy: false)
+        ..add(utf8.encode('RIFF'))
+        ..add(_uint32Bytes(bodyBytes.length))
+        ..add(bodyBytes))
+      .takeBytes();
+}
+
+int _riffChunkOffset(Uint8List wav, String id) {
+  final view = ByteData.sublistView(wav);
+  final end = 8 + view.getUint32(4, Endian.little);
+  var offset = 12;
+  while (offset + 8 <= end) {
+    if (utf8.decode(wav.sublist(offset, offset + 4)) == id) return offset;
+    final size = view.getUint32(offset + 4, Endian.little);
+    offset += 8 + size + (size.isOdd ? 1 : 0);
+  }
+  throw StateError('Missing RIFF chunk $id');
+}
+
+Uint8List _riffChunkData(Uint8List wav, String id) {
+  final offset = _riffChunkOffset(wav, id);
+  final size = ByteData.sublistView(wav).getUint32(offset + 4, Endian.little);
+  return wav.sublist(offset + 8, offset + 8 + size);
 }

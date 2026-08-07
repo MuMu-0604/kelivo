@@ -19,6 +19,22 @@ void main() {
       expect(parsed.thinkingTexts, const ['reasoning here']);
     });
 
+    test('extracts closed thinking block', () {
+      const input = '<thinking>reasoning here</thinking>answer';
+      final parsed = ThinkingTagParser.parseLegacyInlineBlocks(input);
+
+      expect(parsed.visibleContent, 'answer');
+      expect(parsed.thinkingTexts, const ['reasoning here']);
+    });
+
+    test('extracts channel thought block', () {
+      const input = '<|channel>thought reasoning here <channel|>answer';
+      final parsed = ThinkingTagParser.parseLegacyInlineBlocks(input);
+
+      expect(parsed.visibleContent, 'answer');
+      expect(parsed.thinkingTexts, const ['reasoning here']);
+    });
+
     test('extracts multiple closed blocks', () {
       const input = '<think>a</think>mid<thought>b</thought>end';
       final parsed = ThinkingTagParser.parseLegacyInlineBlocks(input);

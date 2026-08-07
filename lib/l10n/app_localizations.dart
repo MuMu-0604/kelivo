@@ -8036,6 +8036,18 @@ abstract class AppLocalizations {
   /// **'Start TTS automatically after an assistant reply finishes.'**
   String get ttsSettingsAutoPlayDescription;
 
+  /// No description provided for @ttsSettingsCacheReplayTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Reuse Audio for Replay'**
+  String get ttsSettingsCacheReplayTitle;
+
+  /// No description provided for @ttsSettingsCacheReplayDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Replay network speech with already generated audio instead of calling the speech service again.'**
+  String get ttsSettingsCacheReplayDescription;
+
   /// No description provided for @ttsSettingsTextSelectionSection.
   ///
   /// In en, this message translates to:
@@ -8167,6 +8179,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Collapse playback controls'**
   String get ttsFloatingCollapseTooltip;
+
+  /// No description provided for @ttsFloatingSaveTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Save audio'**
+  String get ttsFloatingSaveTooltip;
+
+  /// No description provided for @ttsSaveDialogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Save TTS audio'**
+  String get ttsSaveDialogTitle;
+
+  /// No description provided for @ttsSaveSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Audio saved successfully.'**
+  String get ttsSaveSuccess;
+
+  /// No description provided for @ttsSaveNothing.
+  ///
+  /// In en, this message translates to:
+  /// **'No audio is available to save.'**
+  String get ttsSaveNothing;
+
+  /// No description provided for @ttsSaveFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to save audio: {message}'**
+  String ttsSaveFailed(String message);
 
   /// No description provided for @imageViewerPageShareFailedOpenFile.
   ///

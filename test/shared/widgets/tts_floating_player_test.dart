@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:Kelivo/core/providers/tts_provider.dart';
 import 'package:Kelivo/core/services/tts/tts_playback_models.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
@@ -8,7 +10,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart' as lucide;
 import 'package:provider/provider.dart';
 
 class _FakeTtsProvider extends ChangeNotifier implements TtsProvider {
-  _FakeTtsProvider({TtsPlaybackState? state})
+  _FakeTtsProvider({TtsPlaybackState? state, this.canSaveNetworkAudio = false})
     : _state =
           state ??
           const TtsPlaybackState(
@@ -28,7 +30,13 @@ class _FakeTtsProvider extends ChangeNotifier implements TtsProvider {
   final TtsPlaybackState _state;
 
   @override
+  final bool canSaveNetworkAudio;
+
+  @override
   TtsPlaybackState get playbackState => _state;
+
+  @override
+  bool get cacheNetworkAudioForReplay => false;
 
   @override
   Future<void> seekBackward() async {
@@ -57,6 +65,12 @@ class _FakeTtsProvider extends ChangeNotifier implements TtsProvider {
 
   @override
   Future<void> seekTo(Duration position) async {}
+
+  @override
+  Future<void> setCacheNetworkAudioForReplay(bool value) async {}
+
+  @override
+  Future<(Uint8List, String)?> synthesizeAllAndCollect() async => null;
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
@@ -95,6 +109,7 @@ void main() {
     expect(find.byTooltip('后退 15 秒'), findsNothing);
     expect(find.byTooltip('前进 15 秒'), findsNothing);
     expect(find.byTooltip('播放倍速'), findsNothing);
+    expect(find.byTooltip('保存音频'), findsNothing);
     expect(find.byType(Slider), findsNothing);
     expect(find.byIcon(lucide.LucideIcons.grip), findsNothing);
     expect(
@@ -119,6 +134,7 @@ void main() {
     expect(find.byTooltip('后退 15 秒'), findsOneWidget);
     expect(find.byTooltip('前进 15 秒'), findsOneWidget);
     expect(find.byTooltip('播放倍速'), findsOneWidget);
+    expect(find.byTooltip('保存音频'), findsNothing);
     final expandedWidth = tester.getSize(player).width;
 
     await tester.tap(find.byTooltip('后退 15 秒'));
@@ -196,5 +212,39 @@ void main() {
     await tester.tap(find.byTooltip('重新播放'));
 
     expect(tts.playPauseCount, 1);
+  });
+
+  testWidgets('expanded network TTS player exposes save audio action', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1.25;
+    tester.view.physicalSize = const Size(360, 750);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetPhysicalSize);
+
+    final tts = _FakeTtsProvider(canSaveNetworkAudio: true);
+    await tester.pumpWidget(
+      ChangeNotifierProvider<TtsProvider>.value(
+        value: tts,
+        child: MaterialApp(
+          locale: const Locale('zh'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          builder: (context, child) {
+            return AppOverlays(child: child ?? const SizedBox.shrink());
+          },
+          home: const SizedBox.expand(),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.byTooltip('保存音频'), findsNothing);
+
+    await tester.tap(find.byTooltip('展开播放控制'));
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(find.byTooltip('保存音频'), findsOneWidget);
   });
 }

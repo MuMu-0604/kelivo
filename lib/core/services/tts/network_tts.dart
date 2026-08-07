@@ -958,6 +958,143 @@ Uint8List _pcmToWav(
   return out.toBytes();
 }
 
+/// Concatenates RIFF/WAVE files that use the same `fmt ` chunk.
+Uint8List combineWavAudio(List<Uint8List> wavFiles) {
+  if (wavFiles.isEmpty) {
+    throw ArgumentError.value(wavFiles, 'wavFiles', 'Must not be empty.');
+  }
+
+  final parsed = wavFiles.map(_parseWav).toList(growable: false);
+  final format = parsed.first.formatData;
+  for (final wav in parsed.skip(1)) {
+    if (!_sameBytes(format, wav.formatData)) {
+      throw const FormatException('WAV fmt chunks do not match.');
+    }
+  }
+  if (parsed.length == 1) return Uint8List.fromList(wavFiles.single);
+
+  final combinedData = BytesBuilder(copy: false);
+  for (final wav in parsed) {
+    for (final data in wav.audioData) {
+      combinedData.add(data);
+    }
+  }
+  final audioBytes = combinedData.takeBytes();
+  if (audioBytes.isEmpty) {
+    throw const FormatException('WAV data chunk is empty.');
+  }
+
+  final formatTag = _supportedWavFormatTag(format);
+  final blockAlign = ByteData.sublistView(format).getUint16(12, Endian.little);
+  if (blockAlign == 0 || audioBytes.lengthInBytes % blockAlign != 0) {
+    throw const FormatException('Invalid WAV block alignment.');
+  }
+
+  final body = BytesBuilder(copy: false)..add(utf8.encode('WAVE'));
+  _writeRiffChunk(body, 'fmt ', format);
+  if (formatTag != 1) {
+    final sampleCount = audioBytes.lengthInBytes ~/ blockAlign;
+    _writeRiffChunk(body, 'fact', _uint32Le(sampleCount));
+  }
+  _writeRiffChunk(body, 'data', audioBytes);
+
+  final bodyBytes = body.takeBytes();
+  if (bodyBytes.lengthInBytes > 0xffffffff) {
+    throw const FormatException('Combined WAV file is too large.');
+  }
+  final output = BytesBuilder(copy: false)..add(utf8.encode('RIFF'));
+  output.add(_uint32Le(bodyBytes.lengthInBytes));
+  output.add(bodyBytes);
+  return output.takeBytes();
+}
+
+const int _riffFourCc = 0x46464952;
+const int _waveFourCc = 0x45564157;
+const int _fmtFourCc = 0x20746d66;
+const int _dataFourCc = 0x61746164;
+
+({Uint8List formatData, List<Uint8List> audioData}) _parseWav(Uint8List bytes) {
+  if (bytes.lengthInBytes < 12) {
+    throw const FormatException('WAV file is too short.');
+  }
+  final view = ByteData.sublistView(bytes);
+  if (view.getUint32(0, Endian.little) != _riffFourCc ||
+      view.getUint32(8, Endian.little) != _waveFourCc) {
+    throw const FormatException('Invalid RIFF/WAVE header.');
+  }
+
+  final riffEnd = 8 + view.getUint32(4, Endian.little);
+  if (riffEnd < 12 || riffEnd > bytes.lengthInBytes) {
+    throw const FormatException('Invalid RIFF size.');
+  }
+
+  final audioData = <Uint8List>[];
+  Uint8List? formatData;
+  var offset = 12;
+  while (offset < riffEnd) {
+    if (offset + 8 > riffEnd) {
+      throw const FormatException('Truncated WAV chunk header.');
+    }
+    final id = view.getUint32(offset, Endian.little);
+    final size = view.getUint32(offset + 4, Endian.little);
+    final dataStart = offset + 8;
+    final dataEnd = dataStart + size;
+    final paddedEnd = dataEnd + (size.isOdd ? 1 : 0);
+    if (dataEnd > riffEnd || paddedEnd > riffEnd) {
+      throw const FormatException('Truncated WAV chunk data.');
+    }
+
+    final data = Uint8List.fromList(bytes.sublist(dataStart, dataEnd));
+    if (id == _fmtFourCc) {
+      if (formatData != null && !_sameBytes(formatData, data)) {
+        throw const FormatException('WAV contains conflicting fmt chunks.');
+      }
+      formatData = data;
+    } else if (id == _dataFourCc) {
+      audioData.add(data);
+    }
+    offset = paddedEnd;
+  }
+
+  if (formatData == null || audioData.isEmpty) {
+    throw const FormatException('WAV must contain fmt and data chunks.');
+  }
+  return (formatData: formatData, audioData: audioData);
+}
+
+int _supportedWavFormatTag(Uint8List format) {
+  if (format.lengthInBytes < 16) {
+    throw const FormatException('Invalid WAV fmt chunk.');
+  }
+  final view = ByteData.sublistView(format);
+  final tag = view.getUint16(0, Endian.little);
+  if (tag == 1 || tag == 3) return tag;
+  if (tag == 0xfffe && format.lengthInBytes >= 40) {
+    final subFormat = view.getUint16(24, Endian.little);
+    if (subFormat == 1 || subFormat == 3) return subFormat;
+  }
+  throw const FormatException('Unsupported WAV format for concatenation.');
+}
+
+void _writeRiffChunk(BytesBuilder output, String id, Uint8List data) {
+  output.add(utf8.encode(id));
+  output.add(_uint32Le(data.lengthInBytes));
+  output.add(data);
+  if (data.lengthInBytes.isOdd) output.addByte(0);
+}
+
+Uint8List _uint32Le(int value) {
+  return Uint8List(4)..buffer.asByteData().setUint32(0, value, Endian.little);
+}
+
+bool _sameBytes(Uint8List left, Uint8List right) {
+  if (left.lengthInBytes != right.lengthInBytes) return false;
+  for (var i = 0; i < left.lengthInBytes; i++) {
+    if (left[i] != right[i]) return false;
+  }
+  return true;
+}
+
 Uint8List _hexToBytes(String hex) {
   final clean = hex.replaceAll(RegExp(r'\s+'), '');
   if (clean.length % 2 != 0) {

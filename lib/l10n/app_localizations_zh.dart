@@ -4146,6 +4146,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get ttsSettingsAutoPlayDescription => '助手回复生成完成后自动开始 TTS 播放。';
 
   @override
+  String get ttsSettingsCacheReplayTitle => '使用缓存复播';
+
+  @override
+  String get ttsSettingsCacheReplayDescription => '重新播放网络语音时使用已生成的音频，不再请求语音服务。';
+
+  @override
   String get ttsSettingsTextSelectionSection => '文本选择';
 
   @override
@@ -4214,6 +4220,23 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get ttsFloatingCollapseTooltip => '收起播放控制';
+
+  @override
+  String get ttsFloatingSaveTooltip => '保存音频';
+
+  @override
+  String get ttsSaveDialogTitle => '保存 TTS 音频';
+
+  @override
+  String get ttsSaveSuccess => '音频已保存';
+
+  @override
+  String get ttsSaveNothing => '暂无可保存的音频';
+
+  @override
+  String ttsSaveFailed(String message) {
+    return '保存音频失败：$message';
+  }
 
   @override
   String imageViewerPageShareFailedOpenFile(String message) {
@@ -9589,6 +9612,12 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get ttsSettingsAutoPlayDescription => '助手回复生成完成后自动开始 TTS 播放。';
 
   @override
+  String get ttsSettingsCacheReplayTitle => '使用缓存复播';
+
+  @override
+  String get ttsSettingsCacheReplayDescription => '重新播放网络语音时使用已生成的音频，不再请求语音服务。';
+
+  @override
   String get ttsSettingsTextSelectionSection => '文本选择';
 
   @override
@@ -9657,6 +9686,23 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get ttsFloatingCollapseTooltip => '收起播放控制';
+
+  @override
+  String get ttsFloatingSaveTooltip => '保存音频';
+
+  @override
+  String get ttsSaveDialogTitle => '保存 TTS 音频';
+
+  @override
+  String get ttsSaveSuccess => '音频已保存';
+
+  @override
+  String get ttsSaveNothing => '暂无可保存的音频';
+
+  @override
+  String ttsSaveFailed(String message) {
+    return '保存音频失败：$message';
+  }
 
   @override
   String imageViewerPageShareFailedOpenFile(String message) {
@@ -15030,6 +15076,12 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get ttsSettingsAutoPlayDescription => '助理回覆產生完成後自動開始 TTS 播放。';
 
   @override
+  String get ttsSettingsCacheReplayTitle => '使用快取重播';
+
+  @override
+  String get ttsSettingsCacheReplayDescription => '重新播放網路語音時使用已產生的音訊，不再請求語音服務。';
+
+  @override
   String get ttsSettingsTextSelectionSection => '文字選擇';
 
   @override
@@ -15098,6 +15150,23 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get ttsFloatingCollapseTooltip => '收起播放控制';
+
+  @override
+  String get ttsFloatingSaveTooltip => '儲存音訊';
+
+  @override
+  String get ttsSaveDialogTitle => '儲存 TTS 音訊';
+
+  @override
+  String get ttsSaveSuccess => '音訊已儲存';
+
+  @override
+  String get ttsSaveNothing => '暫無可儲存的音訊';
+
+  @override
+  String ttsSaveFailed(String message) {
+    return '儲存音訊失敗：$message';
+  }
 
   @override
   String imageViewerPageShareFailedOpenFile(String message) {
