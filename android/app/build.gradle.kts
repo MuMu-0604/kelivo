@@ -1,4 +1,5 @@
 import java.util.Properties
+import java.io.File
 
 plugins {
     id("com.android.application")
@@ -38,13 +39,31 @@ android {
         keystoreProperties.load(keystorePropertiesFile.inputStream())
     }
 
+    fun signingProperty(name: String): String {
+        val direct = keystoreProperties.getProperty(name)?.trim()
+        if (!direct.isNullOrEmpty()) return direct
+        val normalized = keystoreProperties.entries.firstOrNull { entry ->
+            entry.key.toString()
+                .trim()
+                .removePrefix("\uFEFF")
+                .removePrefix("\u00EF\u00BB\u00BF") == name
+        }?.value?.toString()?.trim()
+        if (!normalized.isNullOrEmpty()) return normalized
+        error("Missing Android signing property '$name' in ${keystorePropertiesFile.absolutePath}")
+    }
+
+    fun signingFile(path: String): File {
+        val file = File(path)
+        return if (file.isAbsolute) file else keystorePropertiesFile.parentFile.resolve(file)
+    }
+
     signingConfigs {
         create("release") {
             if (keystorePropertiesFile.exists()) {
-                storeFile = file(keystoreProperties["storeFile"] as String)
-                storePassword = keystoreProperties["storePassword"] as String
-                keyAlias = keystoreProperties["keyAlias"] as String
-                keyPassword = keystoreProperties["keyPassword"] as String
+                storeFile = signingFile(signingProperty("storeFile"))
+                storePassword = signingProperty("storePassword")
+                keyAlias = signingProperty("keyAlias")
+                keyPassword = signingProperty("keyPassword")
             }
         }
     }
