@@ -419,6 +419,10 @@ class HomeViewModel extends ChangeNotifier {
     );
 
     if (!result.success) {
+      if (input.documents.isNotEmpty) {
+        isProcessingFiles.value = false;
+      }
+      if (result.errorMessage == 'in_flight') return false;
       if (result.errorMessage == 'no_model') {
         onWarning?.call('no_model');
       } else if (result.errorMessage != 'empty_input') {
@@ -490,6 +494,7 @@ class HomeViewModel extends ChangeNotifier {
     );
 
     if (!result.success) {
+      if (result.errorMessage == 'in_flight') return false;
       if (result.errorMessage == 'no_model') {
         onWarning?.call('no_model');
       } else {
@@ -520,6 +525,7 @@ class HomeViewModel extends ChangeNotifier {
     );
 
     if (!result.success) {
+      if (result.errorMessage == 'in_flight') return false;
       if (result.errorMessage == 'no_model') {
         onWarning?.call('no_model');
       } else {

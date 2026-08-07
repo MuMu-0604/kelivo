@@ -75,6 +75,9 @@ class ChatActionResult {
 
   factory ChatActionResult.noModel() =>
       ChatActionResult(success: false, errorMessage: 'no_model');
+
+  factory ChatActionResult.inFlight() =>
+      ChatActionResult(success: false, errorMessage: 'in_flight');
 }
 
 /// Actions class for chat operations (send, regenerate, cancel, streaming).
@@ -240,6 +243,8 @@ class ChatActions {
   /// completion before removing notifiers or triggering rebuild.
   final Map<String, Future<void>> _finishStreamingFutures =
       <String, Future<void>>{};
+  final Map<String, int> _sendInFlightClaims = <String, int>{};
+  var _sendInFlightClaimSerial = 0;
 
   List<ChatMessage> get _messages => chatController.messages;
   Map<String, int> get _versionSelections => chatController.versionSelections;
@@ -248,6 +253,37 @@ class ChatActions {
       chatController.loadingConversationIds;
   Map<String, StreamSubscription<dynamic>> get _conversationStreams =>
       chatController.conversationStreams;
+
+  @visibleForTesting
+  bool isSendInFlight(String conversationId) =>
+      _sendInFlightClaims.containsKey(conversationId);
+
+  @visibleForTesting
+  int? claimSendForTest(
+    String conversationId, {
+    bool allowWhileLoading = false,
+  }) => _claimSend(conversationId, allowWhileLoading: allowWhileLoading);
+
+  @visibleForTesting
+  void releaseSendClaimForTest(String conversationId, int token) =>
+      _releaseSendClaim(conversationId, token);
+
+  int? _claimSend(String conversationId, {bool allowWhileLoading = false}) {
+    if (isSendInFlight(conversationId) ||
+        (!allowWhileLoading &&
+            _loadingConversationIds.contains(conversationId))) {
+      return null;
+    }
+    final token = ++_sendInFlightClaimSerial;
+    _sendInFlightClaims[conversationId] = token;
+    return token;
+  }
+
+  void _releaseSendClaim(String conversationId, int token) {
+    if (_sendInFlightClaims[conversationId] == token) {
+      _sendInFlightClaims.remove(conversationId);
+    }
+  }
 
   static const Duration _streamCancelTimeout = Duration(seconds: 3);
 
@@ -535,107 +571,118 @@ class ChatActions {
     required ChatInputData input,
     required Conversation conversation,
   }) async {
+    final claimToken = _claimSend(conversation.id);
+    if (claimToken == null) {
+      return ChatActionResult.inFlight();
+    }
+
+    var loadingSet = false;
+    var loadingGuardOwnsClaim = false;
     final content = input.text.trim();
-    if (content.isEmpty &&
-        input.imagePaths.isEmpty &&
-        input.documents.isEmpty) {
-      return ChatActionResult.error('empty_input');
-    }
-
-    final settings = contextProvider.read<SettingsProvider>();
-    final assistant = contextProvider
-        .read<AssistantProvider>()
-        .currentAssistant;
-    final assistantId = assistant?.id;
-    // Capture approval service reference before async gap
-    ToolApprovalService? approvalService;
-    AskUserInteractionService? askUserService;
     try {
-      approvalService = contextProvider.read<ToolApprovalService>();
-    } catch (_) {}
-    try {
-      askUserService = contextProvider.read<AskUserInteractionService>();
-    } catch (_) {}
-    final modelConfig = messageGenerationService.getModelConfig(
-      settings,
-      assistant,
-    );
+      if (content.isEmpty &&
+          input.imagePaths.isEmpty &&
+          input.documents.isEmpty) {
+        return ChatActionResult.error('empty_input');
+      }
 
-    if (modelConfig.providerKey == null || modelConfig.modelId == null) {
-      return ChatActionResult.noModel();
-    }
-    final providerKey = modelConfig.providerKey!;
-    final modelId = modelConfig.modelId!;
+      final settings = contextProvider.read<SettingsProvider>();
+      final assistant = contextProvider
+          .read<AssistantProvider>()
+          .currentAssistant;
+      final assistantId = assistant?.id;
+      // Capture approval service reference before async gap
+      ToolApprovalService? approvalService;
+      AskUserInteractionService? askUserService;
+      try {
+        approvalService = contextProvider.read<ToolApprovalService>();
+      } catch (_) {}
+      try {
+        askUserService = contextProvider.read<AskUserInteractionService>();
+      } catch (_) {}
+      final modelConfig = messageGenerationService.getModelConfig(
+        settings,
+        assistant,
+      );
 
-    if (chatController.hasMoreAfter) {
-      final loaded = chatController.loadEndWindow();
-      if (loaded) {
+      if (modelConfig.providerKey == null || modelConfig.modelId == null) {
+        return ChatActionResult.noModel();
+      }
+      final providerKey = modelConfig.providerKey!;
+      final modelId = modelConfig.modelId!;
+
+      if (chatController.hasMoreAfter) {
+        final loaded = chatController.loadEndWindow();
+        if (loaded) {
+          viewModel.restoreMessageUiState();
+        }
+      }
+
+      final existingContextMessages = chatController
+          .messagesForCompleteHistoryContext(conversation);
+      if (_hasUnsupportedAudioAttachments(
+        messages: existingContextMessages,
+        conversation: conversation,
+        settings: settings,
+        providerKey: providerKey,
+        modelId: modelId,
+        pendingInput: input,
+        maxRawTruncateIndex: null,
+      )) {
+        return ChatActionResult.error('audio_attachment_unsupported');
+      }
+
+      // Create user message
+      final userMessage = await messageGenerationService.createUserMessage(
+        conversationId: conversation.id,
+        input: input,
+        assistant: assistant,
+      );
+      if (chatController.appendPersistedTailMessage(userMessage)) {
         viewModel.restoreMessageUiState();
       }
-    }
+      onMessagesChanged?.call();
 
-    final existingContextMessages = chatController
-        .messagesForCompleteHistoryContext(conversation);
-    if (_hasUnsupportedAudioAttachments(
-      messages: existingContextMessages,
-      conversation: conversation,
-      settings: settings,
-      providerKey: providerKey,
-      modelId: modelId,
-      pendingInput: input,
-      maxRawTruncateIndex: null,
-    )) {
-      return ChatActionResult.error('audio_attachment_unsupported');
-    }
+      _setConversationLoading(conversation.id, true);
+      loadingSet = true;
+      loadingGuardOwnsClaim = true;
+      _releaseSendClaim(conversation.id, claimToken);
 
-    // Create user message
-    final userMessage = await messageGenerationService.createUserMessage(
-      conversationId: conversation.id,
-      input: input,
-      assistant: assistant,
-    );
-    if (chatController.appendPersistedTailMessage(userMessage)) {
-      viewModel.restoreMessageUiState();
-    }
-    onMessagesChanged?.call();
+      // Create assistant message placeholder
+      final assistantMessage = await messageGenerationService
+          .createAssistantPlaceholder(
+            conversationId: conversation.id,
+            modelId: modelId,
+            providerKey: providerKey,
+          );
 
-    _setConversationLoading(conversation.id, true);
+      // Pre-create streaming notifier BEFORE adding message to list
+      // so that MessageListView can detect it's streaming on first render
+      streamController.markStreamingStarted(assistantMessage.id);
 
-    // Create assistant message placeholder
-    final assistantMessage = await messageGenerationService
-        .createAssistantPlaceholder(
-          conversationId: conversation.id,
-          modelId: modelId,
-          providerKey: providerKey,
-        );
+      if (chatController.appendPersistedTailMessage(assistantMessage)) {
+        viewModel.restoreMessageUiState();
+      }
+      onMessagesChanged?.call();
 
-    // Pre-create streaming notifier BEFORE adding message to list
-    // so that MessageListView can detect it's streaming on first render
-    streamController.markStreamingStarted(assistantMessage.id);
+      // Reset tool parts and initialize reasoning
+      streamController.toolParts.remove(assistantMessage.id);
+      final supportsReasoning = _isReasoningModel(providerKey, modelId);
+      final enableReasoning =
+          supportsReasoning &&
+          _isReasoningEnabled(
+            assistant?.thinkingBudget ?? settings.thinkingBudget,
+          );
+      await messageGenerationService.initializeReasoningState(
+        messageId: assistantMessage.id,
+        enableReasoning: enableReasoning,
+      );
 
-    if (chatController.appendPersistedTailMessage(assistantMessage)) {
-      viewModel.restoreMessageUiState();
-    }
-    onMessagesChanged?.call();
-
-    // Reset tool parts and initialize reasoning
-    streamController.toolParts.remove(assistantMessage.id);
-    final supportsReasoning = _isReasoningModel(providerKey, modelId);
-    final enableReasoning =
-        supportsReasoning &&
-        _isReasoningEnabled(
-          assistant?.thinkingBudget ?? settings.thinkingBudget,
-        );
-    await messageGenerationService.initializeReasoningState(
-      messageId: assistantMessage.id,
-      enableReasoning: enableReasoning,
-    );
-
-    // Prepare API messages
-    messageGenerationService.onFileProcessingStarted = onFileProcessingStarted;
-    messageGenerationService.onFileProcessingFinished =
-        onFileProcessingFinished;
-    try {
+      // Prepare API messages
+      messageGenerationService.onFileProcessingStarted =
+          onFileProcessingStarted;
+      messageGenerationService.onFileProcessingFinished =
+          onFileProcessingFinished;
       final apiContextMessages = chatController
           .messagesForCompleteHistoryContext(conversation);
       final prepared = await messageGenerationService
@@ -685,7 +732,14 @@ class ChatActions {
     } catch (e) {
       // Ensure file processing indicator is cleared on error
       onFileProcessingFinished?.call();
+      if (loadingSet) {
+        _setConversationLoading(conversation.id, false);
+      }
       return ChatActionResult.error(e.toString());
+    } finally {
+      if (!loadingGuardOwnsClaim) {
+        _releaseSendClaim(conversation.id, claimToken);
+      }
     }
   }
 
@@ -706,178 +760,202 @@ class ChatActions {
     bool assistantAsNewReply = false,
     bool allowImagesApiRouting = true,
   }) async {
+    final claimToken = _claimSend(conversation.id, allowWhileLoading: true);
+    if (claimToken == null) {
+      return ChatActionResult.inFlight();
+    }
+
+    var loadingSet = false;
+    var loadingGuardOwnsClaim = false;
     // Avoid using BuildContext across async gaps (this class holds a BuildContext).
-    final settings = contextProvider.read<SettingsProvider>();
-    final assistant = contextProvider
-        .read<AssistantProvider>()
-        .currentAssistant;
-    // Capture approval service reference before async gap
-    ToolApprovalService? regenApprovalService;
-    AskUserInteractionService? regenAskUserService;
     try {
-      regenApprovalService = contextProvider.read<ToolApprovalService>();
-    } catch (_) {}
-    try {
-      regenAskUserService = contextProvider.read<AskUserInteractionService>();
-    } catch (_) {}
+      final settings = contextProvider.read<SettingsProvider>();
+      final assistant = contextProvider
+          .read<AssistantProvider>()
+          .currentAssistant;
+      // Capture approval service reference before async gap
+      ToolApprovalService? regenApprovalService;
+      AskUserInteractionService? regenAskUserService;
+      try {
+        regenApprovalService = contextProvider.read<ToolApprovalService>();
+      } catch (_) {}
+      try {
+        regenAskUserService = contextProvider.read<AskUserInteractionService>();
+      } catch (_) {}
 
-    await cancelStreaming(conversation);
+      await cancelStreaming(conversation);
 
-    final completeMessages = chatController.messagesForCompleteHistoryContext(
-      conversation,
-    );
-    final idx = completeMessages.indexWhere((m) => m.id == message.id);
-    if (idx < 0) {
-      return ChatActionResult.error('message_not_found');
-    }
+      final completeMessages = chatController.messagesForCompleteHistoryContext(
+        conversation,
+      );
+      final idx = completeMessages.indexWhere((m) => m.id == message.id);
+      if (idx < 0) {
+        return ChatActionResult.error('message_not_found');
+      }
 
-    // Calculate versioning using service
-    final versioning = messageGenerationService.calculateRegenerationVersioning(
-      message: message,
-      messages: completeMessages,
-      assistantAsNewReply: assistantAsNewReply,
-    );
-    if (versioning.lastKeep < 0) {
-      return ChatActionResult.error('invalid_versioning');
-    }
+      // Calculate versioning using service
+      final versioning = messageGenerationService
+          .calculateRegenerationVersioning(
+            message: message,
+            messages: completeMessages,
+            assistantAsNewReply: assistantAsNewReply,
+          );
+      if (versioning.lastKeep < 0) {
+        return ChatActionResult.error('invalid_versioning');
+      }
 
-    // Get model config
-    final assistantId = assistant?.id;
-    final modelConfig = messageGenerationService.getModelConfig(
-      settings,
-      assistant,
-    );
+      // Get model config
+      final assistantId = assistant?.id;
+      final modelConfig = messageGenerationService.getModelConfig(
+        settings,
+        assistant,
+      );
 
-    if (modelConfig.providerKey == null || modelConfig.modelId == null) {
-      return ChatActionResult.noModel();
-    }
-    final providerKey = modelConfig.providerKey!;
-    final modelId = modelConfig.modelId!;
+      if (modelConfig.providerKey == null || modelConfig.modelId == null) {
+        return ChatActionResult.noModel();
+      }
+      final providerKey = modelConfig.providerKey!;
+      final modelId = modelConfig.modelId!;
 
-    final projectedMessages = ChatActions.projectMessagesForRegenerationContext(
-      messages: completeMessages,
-      lastKeep: versioning.lastKeep,
-      targetGroupId: versioning.targetGroupId,
-    );
-    if (_hasUnsupportedAudioAttachments(
-      messages: projectedMessages,
-      conversation: conversation,
-      settings: settings,
-      providerKey: providerKey,
-      modelId: modelId,
-      maxRawTruncateIndex: versioning.lastKeep,
-    )) {
-      return ChatActionResult.error('audio_attachment_unsupported');
-    }
+      final projectedMessages =
+          ChatActions.projectMessagesForRegenerationContext(
+            messages: completeMessages,
+            lastKeep: versioning.lastKeep,
+            targetGroupId: versioning.targetGroupId,
+          );
+      if (_hasUnsupportedAudioAttachments(
+        messages: projectedMessages,
+        conversation: conversation,
+        settings: settings,
+        providerKey: providerKey,
+        modelId: modelId,
+        maxRawTruncateIndex: versioning.lastKeep,
+      )) {
+        return ChatActionResult.error('audio_attachment_unsupported');
+      }
 
-    if (settings.regenerateDeleteTrailingMessages) {
-      final removeIds = await messageGenerationService.removeTrailingMessages(
+      if (settings.regenerateDeleteTrailingMessages) {
+        final removeIds = await messageGenerationService.removeTrailingMessages(
+          messages: completeMessages,
+          lastKeep: versioning.lastKeep,
+          targetGroupId: versioning.targetGroupId,
+        );
+        if (removeIds.isNotEmpty) {
+          chatController.reloadMessages();
+          viewModel.restoreMessageUiState();
+          onMessagesChanged?.call();
+        }
+      }
+
+      // Create assistant message placeholder (new version)
+      final assistantMessage = await messageGenerationService
+          .createAssistantPlaceholder(
+            conversationId: conversation.id,
+            modelId: modelId,
+            providerKey: providerKey,
+            groupId: versioning.targetGroupId,
+            version: versioning.nextVersion,
+          );
+
+      // Pre-create streaming notifier BEFORE adding message to list
+      // so that MessageListView can detect it's streaming on first render
+      streamController.markStreamingStarted(assistantMessage.id);
+
+      // Persist version selection
+      final gid = assistantMessage.groupId ?? assistantMessage.id;
+      _versionSelections[gid] = assistantMessage.version;
+      await chatService.setSelectedVersion(
+        conversation.id,
+        gid,
+        assistantMessage.version,
+      );
+
+      final regenerationMessages = ChatActions.buildRegenerationMessages(
         messages: completeMessages,
         lastKeep: versioning.lastKeep,
         targetGroupId: versioning.targetGroupId,
+        assistantPlaceholder: assistantMessage,
       );
-      if (removeIds.isNotEmpty) {
-        chatController.reloadMessages();
+
+      if (chatController.appendPersistedTailMessage(assistantMessage)) {
         viewModel.restoreMessageUiState();
-        onMessagesChanged?.call();
+      }
+      onMessagesChanged?.call();
+
+      _setConversationLoading(conversation.id, true);
+      loadingSet = true;
+      loadingGuardOwnsClaim = true;
+      _releaseSendClaim(conversation.id, claimToken);
+
+      // Initialize reasoning
+      final supportsReasoning = _isReasoningModel(providerKey, modelId);
+      final enableReasoning =
+          supportsReasoning &&
+          _isReasoningEnabled(
+            assistant?.thinkingBudget ?? settings.thinkingBudget,
+          );
+      await messageGenerationService.initializeReasoningState(
+        messageId: assistantMessage.id,
+        enableReasoning: enableReasoning,
+      );
+
+      // Prepare API messages
+      final prepared = await messageGenerationService
+          .prepareApiMessagesWithInjections(
+            messages: regenerationMessages,
+            versionSelections: _versionSelections,
+            currentConversation: _conversationForMessageContext(
+              conversation,
+              regenerationMessages,
+              maxRawTruncateIndex: versioning.lastKeep,
+            ),
+            settings: settings,
+            assistant: assistant,
+            assistantId: assistantId,
+            providerKey: providerKey,
+            modelId: modelId,
+            approvalService: regenApprovalService,
+            askUserService: regenAskUserService,
+          );
+
+      // Build user image paths
+      final userMediaPaths = messageGenerationService.buildUserMediaPaths(
+        input: null,
+        lastUserMediaPaths: prepared.lastUserMediaPaths,
+        settings: settings,
+        assistant: assistant,
+        providerKey: providerKey,
+        modelId: modelId,
+      );
+
+      // Execute generation
+      final ctx = messageGenerationService.buildGenerationContext(
+        assistantMessage: assistantMessage,
+        prepared: prepared,
+        userMediaPaths: userMediaPaths,
+        allowImagesApiRouting: allowImagesApiRouting,
+        providerKey: providerKey,
+        modelId: modelId,
+        assistant: assistant,
+        settings: settings,
+        supportsReasoning: supportsReasoning,
+        enableReasoning: enableReasoning,
+        generateTitleOnFinish: false,
+      );
+
+      await _executeGeneration(ctx);
+      return ChatActionResult.success(assistantMessage);
+    } catch (e) {
+      onFileProcessingFinished?.call();
+      if (loadingSet) {
+        _setConversationLoading(conversation.id, false);
+      }
+      return ChatActionResult.error(e.toString());
+    } finally {
+      if (!loadingGuardOwnsClaim) {
+        _releaseSendClaim(conversation.id, claimToken);
       }
     }
-
-    // Create assistant message placeholder (new version)
-    final assistantMessage = await messageGenerationService
-        .createAssistantPlaceholder(
-          conversationId: conversation.id,
-          modelId: modelId,
-          providerKey: providerKey,
-          groupId: versioning.targetGroupId,
-          version: versioning.nextVersion,
-        );
-
-    // Pre-create streaming notifier BEFORE adding message to list
-    // so that MessageListView can detect it's streaming on first render
-    streamController.markStreamingStarted(assistantMessage.id);
-
-    // Persist version selection
-    final gid = assistantMessage.groupId ?? assistantMessage.id;
-    _versionSelections[gid] = assistantMessage.version;
-    await chatService.setSelectedVersion(
-      conversation.id,
-      gid,
-      assistantMessage.version,
-    );
-
-    final regenerationMessages = ChatActions.buildRegenerationMessages(
-      messages: completeMessages,
-      lastKeep: versioning.lastKeep,
-      targetGroupId: versioning.targetGroupId,
-      assistantPlaceholder: assistantMessage,
-    );
-
-    if (chatController.appendPersistedTailMessage(assistantMessage)) {
-      viewModel.restoreMessageUiState();
-    }
-    onMessagesChanged?.call();
-
-    _setConversationLoading(conversation.id, true);
-
-    // Initialize reasoning
-    final supportsReasoning = _isReasoningModel(providerKey, modelId);
-    final enableReasoning =
-        supportsReasoning &&
-        _isReasoningEnabled(
-          assistant?.thinkingBudget ?? settings.thinkingBudget,
-        );
-    await messageGenerationService.initializeReasoningState(
-      messageId: assistantMessage.id,
-      enableReasoning: enableReasoning,
-    );
-
-    // Prepare API messages
-    final prepared = await messageGenerationService
-        .prepareApiMessagesWithInjections(
-          messages: regenerationMessages,
-          versionSelections: _versionSelections,
-          currentConversation: _conversationForMessageContext(
-            conversation,
-            regenerationMessages,
-            maxRawTruncateIndex: versioning.lastKeep,
-          ),
-          settings: settings,
-          assistant: assistant,
-          assistantId: assistantId,
-          providerKey: providerKey,
-          modelId: modelId,
-          approvalService: regenApprovalService,
-          askUserService: regenAskUserService,
-        );
-
-    // Build user image paths
-    final userMediaPaths = messageGenerationService.buildUserMediaPaths(
-      input: null,
-      lastUserMediaPaths: prepared.lastUserMediaPaths,
-      settings: settings,
-      assistant: assistant,
-      providerKey: providerKey,
-      modelId: modelId,
-    );
-
-    // Execute generation
-    final ctx = messageGenerationService.buildGenerationContext(
-      assistantMessage: assistantMessage,
-      prepared: prepared,
-      userMediaPaths: userMediaPaths,
-      allowImagesApiRouting: allowImagesApiRouting,
-      providerKey: providerKey,
-      modelId: modelId,
-      assistant: assistant,
-      settings: settings,
-      supportsReasoning: supportsReasoning,
-      enableReasoning: enableReasoning,
-      generateTitleOnFinish: false,
-    );
-
-    await _executeGeneration(ctx);
-    return ChatActionResult.success(assistantMessage);
   }
 
   Future<ChatActionResult> continueAssistantMessageAfterToolAnswer({
@@ -885,61 +963,71 @@ class ChatActions {
     required Conversation conversation,
     bool allowImagesApiRouting = true,
   }) async {
-    final settings = contextProvider.read<SettingsProvider>();
-    final assistant = contextProvider
-        .read<AssistantProvider>()
-        .currentAssistant;
-    ToolApprovalService? approvalService;
-    AskUserInteractionService? askUserService;
-    try {
-      approvalService = contextProvider.read<ToolApprovalService>();
-    } catch (_) {}
-    try {
-      askUserService = contextProvider.read<AskUserInteractionService>();
-    } catch (_) {}
-
-    final visibleIndex = _messages.indexWhere(
-      (candidate) => candidate.id == message.id,
-    );
-    if (visibleIndex < 0 || message.role != 'assistant') {
-      return ChatActionResult.error('message_not_found');
-    }
-    final completeMessages = chatController.messagesForCompleteHistoryContext(
-      conversation,
-    );
-    final contextIndex = completeMessages.indexWhere(
-      (candidate) => candidate.id == message.id,
-    );
-    if (contextIndex < 0) {
-      return ChatActionResult.error('message_not_found');
+    final claimToken = _claimSend(conversation.id, allowWhileLoading: true);
+    if (claimToken == null) {
+      return ChatActionResult.inFlight();
     }
 
-    final modelConfig = messageGenerationService.getModelConfig(
-      settings,
-      assistant,
-    );
-    if (modelConfig.providerKey == null || modelConfig.modelId == null) {
-      return ChatActionResult.noModel();
-    }
-    final providerKey = modelConfig.providerKey!;
-    final modelId = modelConfig.modelId!;
-
-    final streamingMessage = _messages[visibleIndex].copyWith(
-      isStreaming: true,
-    );
-    _messages[visibleIndex] = streamingMessage;
-    await chatService.updateMessage(streamingMessage.id, isStreaming: true);
-    onMessagesChanged?.call();
-    _setConversationLoading(conversation.id, true);
-
-    final supportsReasoning = _isReasoningModel(providerKey, modelId);
-    final enableReasoning =
-        supportsReasoning &&
-        _isReasoningEnabled(
-          assistant?.thinkingBudget ?? settings.thinkingBudget,
-        );
-
+    var loadingSet = false;
+    var loadingGuardOwnsClaim = false;
     try {
+      final settings = contextProvider.read<SettingsProvider>();
+      final assistant = contextProvider
+          .read<AssistantProvider>()
+          .currentAssistant;
+      ToolApprovalService? approvalService;
+      AskUserInteractionService? askUserService;
+      try {
+        approvalService = contextProvider.read<ToolApprovalService>();
+      } catch (_) {}
+      try {
+        askUserService = contextProvider.read<AskUserInteractionService>();
+      } catch (_) {}
+
+      final visibleIndex = _messages.indexWhere(
+        (candidate) => candidate.id == message.id,
+      );
+      if (visibleIndex < 0 || message.role != 'assistant') {
+        return ChatActionResult.error('message_not_found');
+      }
+      final completeMessages = chatController.messagesForCompleteHistoryContext(
+        conversation,
+      );
+      final contextIndex = completeMessages.indexWhere(
+        (candidate) => candidate.id == message.id,
+      );
+      if (contextIndex < 0) {
+        return ChatActionResult.error('message_not_found');
+      }
+
+      final modelConfig = messageGenerationService.getModelConfig(
+        settings,
+        assistant,
+      );
+      if (modelConfig.providerKey == null || modelConfig.modelId == null) {
+        return ChatActionResult.noModel();
+      }
+      final providerKey = modelConfig.providerKey!;
+      final modelId = modelConfig.modelId!;
+
+      final streamingMessage = _messages[visibleIndex].copyWith(
+        isStreaming: true,
+      );
+      _messages[visibleIndex] = streamingMessage;
+      await chatService.updateMessage(streamingMessage.id, isStreaming: true);
+      onMessagesChanged?.call();
+      _setConversationLoading(conversation.id, true);
+      loadingSet = true;
+      loadingGuardOwnsClaim = true;
+      _releaseSendClaim(conversation.id, claimToken);
+
+      final supportsReasoning = _isReasoningModel(providerKey, modelId);
+      final enableReasoning =
+          supportsReasoning &&
+          _isReasoningEnabled(
+            assistant?.thinkingBudget ?? settings.thinkingBudget,
+          );
+
       final apiContextMessages = List<ChatMessage>.of(completeMessages);
       apiContextMessages[contextIndex] = streamingMessage.copyWith(content: '');
       final prepared = await messageGenerationService
@@ -985,11 +1073,23 @@ class ChatActions {
       await _executeGeneration(ctx);
       return ChatActionResult.success(streamingMessage);
     } catch (e) {
-      streamController.markStreamingEnded(streamingMessage.id);
-      _messages[visibleIndex] = streamingMessage.copyWith(isStreaming: false);
-      await chatService.updateMessage(streamingMessage.id, isStreaming: false);
-      _setConversationLoading(conversation.id, false);
+      if (loadingSet) {
+        final index = _messages.indexWhere((m) => m.id == message.id);
+        if (index != -1) {
+          final stopped = _messages[index].copyWith(isStreaming: false);
+          streamController.markStreamingEnded(stopped.id);
+          _messages[index] = stopped;
+          await chatService.updateMessage(stopped.id, isStreaming: false);
+        }
+      }
+      if (loadingSet) {
+        _setConversationLoading(conversation.id, false);
+      }
       return ChatActionResult.error(e.toString());
+    } finally {
+      if (!loadingGuardOwnsClaim) {
+        _releaseSendClaim(conversation.id, claimToken);
+      }
     }
   }
 
