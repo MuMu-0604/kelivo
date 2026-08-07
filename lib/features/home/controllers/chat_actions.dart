@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:collection';
 import 'package:flutter/widgets.dart';
 import 'package:provider/provider.dart';
 import '../../../core/models/chat_input_data.dart';
@@ -21,6 +22,38 @@ import 'chat_controller.dart';
 import 'generation_controller.dart';
 import 'home_view_model.dart';
 import 'stream_controller.dart' as stream_ctrl;
+
+final class _BarrierStreamSubscription<T> implements StreamSubscription<T> {
+  _BarrierStreamSubscription(this._delegate, this._cancelWithBarrier);
+
+  final StreamSubscription<T> _delegate;
+  final Future<void> Function() _cancelWithBarrier;
+
+  @override
+  Future<void> cancel() => _cancelWithBarrier();
+
+  @override
+  void onData(void Function(T data)? handleData) =>
+      _delegate.onData(handleData);
+
+  @override
+  void onError(Function? handleError) => _delegate.onError(handleError);
+
+  @override
+  void onDone(void Function()? handleDone) => _delegate.onDone(handleDone);
+
+  @override
+  void pause([Future<void>? resumeSignal]) => _delegate.pause(resumeSignal);
+
+  @override
+  void resume() => _delegate.resume();
+
+  @override
+  bool get isPaused => _delegate.isPaused;
+
+  @override
+  Future<E> asFuture<E>([E? futureValue]) => _delegate.asFuture(futureValue);
+}
 
 /// Result of a send/regenerate action.
 class ChatActionResult {
@@ -216,6 +249,22 @@ class ChatActions {
   Map<String, StreamSubscription<dynamic>> get _conversationStreams =>
       chatController.conversationStreams;
 
+  static const Duration _streamCancelTimeout = Duration(seconds: 3);
+
+  /// Bound stream cancellation so a stalled network await cannot freeze local
+  /// stop cleanup indefinitely.
+  Future<void> _cancelSubscriptionWithTimeout(
+    StreamSubscription<dynamic> subscription,
+  ) async {
+    try {
+      await subscription.cancel().timeout(_streamCancelTimeout);
+    } on TimeoutException {
+      // Cancellation keeps running in the background.
+    } catch (_) {
+      // The request is already being aborted; local cleanup must still run.
+    }
+  }
+
   void _setConversationLoading(String conversationId, bool loading) {
     chatController.setConversationLoading(conversationId, loading);
     onLoadingChanged?.call(conversationId, loading);
@@ -266,54 +315,99 @@ class ChatActions {
     required Future<void> Function(Object error, StackTrace stackTrace) onError,
     required Future<void> Function() onDone,
   }) {
-    late final StreamSubscription<T> subscription;
-    var terminalStarted = false;
+    final events =
+        Queue<({T? data, Object? error, StackTrace? stackTrace, bool done})>();
+    late final StreamSubscription<T> sourceSubscription;
+    Future<void>? drainFuture;
+    var terminalQueued = false;
 
-    Future<void> handleError(Object error, StackTrace stackTrace) async {
-      if (terminalStarted) return;
-      terminalStarted = true;
+    Future<void> reportError(Object error, StackTrace stackTrace) async {
       try {
         await onError(error, stackTrace);
-      } finally {
-        await subscription.cancel();
-      }
-    }
-
-    Future<void> handleDone() async {
-      if (terminalStarted) return;
-      terminalStarted = true;
-      try {
-        await onDone();
-      } catch (error, stackTrace) {
-        terminalStarted = false;
-        await handleError(error, stackTrace);
-      }
-    }
-
-    subscription = stream.listen(
-      (chunk) {
-        if (terminalStarted) return;
-        subscription.pause();
-        Future<void>.sync(() => onData(chunk)).then(
-          (_) {
-            if (!terminalStarted) {
-              subscription.resume();
-            }
-          },
-          onError: (Object error, StackTrace stackTrace) {
-            unawaited(handleError(error, stackTrace));
-          },
+      } catch (secondaryError, secondaryStackTrace) {
+        FlutterError.reportError(
+          FlutterErrorDetails(
+            exception: secondaryError,
+            stack: secondaryStackTrace,
+            context: ErrorDescription(
+              'while handling a sequential stream terminal error',
+            ),
+          ),
         );
+      }
+    }
+
+    Future<void> drain() async {
+      try {
+        while (events.isNotEmpty) {
+          final event = events.removeFirst();
+          final error = event.error;
+          if (error != null) {
+            await reportError(error, event.stackTrace ?? StackTrace.current);
+            await sourceSubscription.cancel();
+            events.clear();
+            return;
+          }
+          if (event.done) {
+            await onDone();
+            return;
+          }
+          await onData(event.data as T);
+        }
+      } catch (error, stackTrace) {
+        terminalQueued = true;
+        events.clear();
+        await reportError(error, stackTrace);
+        await sourceSubscription.cancel();
+      }
+    }
+
+    late final void Function() scheduleDrain;
+    scheduleDrain = () {
+      drainFuture ??= drain().whenComplete(() {
+        drainFuture = null;
+        if (events.isNotEmpty) scheduleDrain();
+      });
+    };
+
+    void enqueue(
+      ({T? data, Object? error, StackTrace? stackTrace, bool done}) event,
+    ) {
+      events.add(event);
+      scheduleDrain();
+    }
+
+    sourceSubscription = stream.listen(
+      (chunk) {
+        if (terminalQueued) return;
+        enqueue((data: chunk, error: null, stackTrace: null, done: false));
       },
       onError: (Object error, StackTrace stackTrace) {
-        unawaited(handleError(error, stackTrace));
+        if (terminalQueued) return;
+        terminalQueued = true;
+        enqueue((
+          data: null,
+          error: error,
+          stackTrace: stackTrace,
+          done: false,
+        ));
       },
       onDone: () {
-        unawaited(handleDone());
+        if (terminalQueued) return;
+        terminalQueued = true;
+        enqueue((data: null, error: null, stackTrace: null, done: true));
       },
       cancelOnError: true,
     );
-    return subscription;
+    return _BarrierStreamSubscription<T>(sourceSubscription, () async {
+      terminalQueued = true;
+      events.clear();
+      try {
+        await sourceSubscription.cancel();
+      } finally {
+        await drainFuture;
+      }
+    });
   }
 
   bool _supportsAudioAttachmentsForProvider(
@@ -923,10 +1017,15 @@ class ChatActions {
     // Reset file processing state on cancel
     onFileProcessingFinished?.call();
 
+    // Abort the HTTP request before waiting on the subscription: otherwise a
+    // stalled network await can make the Stop button appear frozen.
+    ChatApiService.cancelRequest(cid);
+
     // Cancel active stream for current conversation only
     final sub = _conversationStreams.remove(cid);
-    await sub?.cancel();
-    ChatApiService.cancelRequest(cid);
+    if (sub != null) {
+      await _cancelSubscriptionWithTimeout(sub);
+    }
 
     // Find the latest assistant streaming message within current conversation and mark it finished
     ChatMessage? streaming;
@@ -1035,7 +1134,13 @@ class ChatActions {
         ocrActive: ctx.ocrActive,
       );
 
-      await _conversationStreams[conversationId]?.cancel();
+      // Replacing a previous stream: abort its request before awaiting
+      // subscription teardown so a dead connection cannot block generation.
+      final previousSub = _conversationStreams.remove(conversationId);
+      if (previousSub != null) {
+        ChatApiService.cancelRequest(conversationId);
+        await _cancelSubscriptionWithTimeout(previousSub);
+      }
       final sub = listenSequentiallyToStream<ChatStreamChunk>(
         stream: stream,
         onData: (chunk) => _handleStreamChunk(chunk, state),
@@ -1403,7 +1508,9 @@ class ChatActions {
         ..expanded = !(autoCollapseThinking ?? false);
     }
 
-    await _conversationStreams.remove(conversationId)?.cancel();
+    // This handler runs inside the sequential stream drain. Awaiting cancel()
+    // here would wait on the drain itself, so only drop the map entry.
+    _conversationStreams.remove(conversationId);
 
     // Ensure reasoning is finished
     final r = streamController.reasoning[messageId];
@@ -1605,7 +1712,9 @@ class ChatActions {
           },
     );
 
-    await _conversationStreams.remove(conversationId)?.cancel();
+    // The sequential stream drain owns source cancellation after this handler
+    // returns. Re-entering cancel() here can deadlock that drain.
+    _conversationStreams.remove(conversationId);
     onStreamError?.call(errorText);
     onStreamFinished?.call();
     await _finishIosBackgroundGeneration(success: false, detail: errorText);
@@ -1640,7 +1749,9 @@ class ChatActions {
     // Idempotent: ensure notifier is removed even if _finishStreaming was skipped
     streamController.removeStreamingNotifier(messageId);
     onStreamFinished?.call();
-    await _conversationStreams.remove(conversationId)?.cancel();
+    // Source stream is already done; avoid self-cancelling from inside the
+    // sequential drain and just remove the tracked subscription.
+    _conversationStreams.remove(conversationId);
   }
 
   // ============================================================================

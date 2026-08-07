@@ -150,5 +150,53 @@ void main() {
 
       expect(started, const [1, 2]);
     });
+
+    test(
+      'cancel waits for the active handler and drops queued chunks',
+      () async {
+        final controller = async.StreamController<int>();
+        final firstStarted = async.Completer<void>();
+        final allowFirstToFinish = async.Completer<void>();
+        final cancelled = async.Completer<void>();
+        final seen = <int>[];
+
+        final subscription = ChatActions.listenSequentiallyToStream<int>(
+          stream: controller.stream,
+          onData: (value) async {
+            seen.add(value);
+            if (value == 1) {
+              firstStarted.complete();
+              await allowFirstToFinish.future;
+            }
+          },
+          onError: (error, stackTrace) async {
+            fail('unexpected stream error: $error');
+          },
+          onDone: () async {
+            fail('cancelled stream should not call done');
+          },
+        );
+        addTearDown(subscription.cancel);
+
+        controller
+          ..add(1)
+          ..add(2);
+        await firstStarted.future.timeout(const Duration(seconds: 1));
+
+        async.unawaited(
+          subscription.cancel().then((_) {
+            cancelled.complete();
+          }),
+        );
+        await Future<void>.delayed(Duration.zero);
+        expect(cancelled.isCompleted, isFalse);
+        expect(seen, const [1]);
+
+        allowFirstToFinish.complete();
+        await cancelled.future.timeout(const Duration(seconds: 1));
+        expect(seen, const [1]);
+        await controller.close();
+      },
+    );
   });
 }
